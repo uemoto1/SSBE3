@@ -109,8 +109,8 @@ contains
             open(99, file='.namelist.tmp', action='read')
 {CODE_REWIND}
             close(99)
-        end if
 {CODE_DUMP}
+        end if
 {CODE_BCAST}
 
     end subroutine read_input
@@ -161,9 +161,9 @@ code_dump = ""
 for group_name, group_data in setting:
     for var_name, var_type, var_dim, var_defval in group_data:
         if var_type.startswith("character"):
-            code_dump += ind2 + "write(*,'(a,a)') '%s: %s = ', trim(%s)\n" % (group_name, var_name, var_name)
+            code_dump += ind3 + "write(*,'(a,a)') '%s: %s = ', trim(%s)\n" % (group_name, var_name, var_name)
         else:
-            code_dump += ind2 + "write(*,'(a,99%s)') '%s: %s = ', %s\n" % (tbl_fmt[var_type], group_name, var_name, var_name)
+            code_dump += ind3 + "write(*,'(a,99%s)') '%s: %s = ', %s\n" % (tbl_fmt[var_type], group_name, var_name, var_name)
 
 code_bcast = ""
 for group_name, group_data in setting:
