@@ -124,6 +124,56 @@ contains
         & file_macropoint
 
 
+        theory = 'perturb_dielec'
+        sysname = 'test'
+        base_directory = './'
+        gs_directory = './'
+        read_sbe_gs_bin = 'n'
+        write_sbe_gs_bin = 'y'
+        al = (/0.0, 0.0, 0.0/)
+        al_vec1 = (/0.0, 0.0, 0.0/)
+        al_vec2 = (/0.0, 0.0, 0.0/)
+        al_vec3 = (/0.0, 0.0, 0.0/)
+        nstate = 0
+        nelec = 0
+        nstate_sbe = 0
+        nkgrid = (/0, 0, 0/)
+        nt = 1000
+        dt = 1.0d-2
+        e_impulse = 0.0d0
+        ae_shape1 = 'none'
+        ae_shape2 = 'none'
+        epdir_re1 = (/0.0, 0.0, 0.0/)
+        epdir_re2 = (/0.0, 0.0, 0.0/)
+        epdir_im1 = (/0.0, 0.0, 0.0/)
+        epdir_im2 = (/0.0, 0.0, 0.0/)
+        phi_cep1 = 0.0d0
+        phi_cep2 = 0.0d0
+        E_amplitude1 = 0.0d0
+        E_amplitude2 = 0.0d0
+        I_wcm2_1 = 0.0d0
+        I_wcm2_2 = 0.0d0
+        tw1 = 0.0d0
+        tw2 = 0.0d0
+        omega1 = 0.0d0
+        omega2 = 0.0d0
+        t1_t2 = 0.0d0
+        t1_start = 0.0d0
+        nenergy = 1000
+        de = 1.0d-3
+        gamma = 5.0d-3
+        fdtddim = ''
+        twod_shape = ''
+        nx_m = 0
+        ny_m = 0
+        nz_m = 0
+        nmacro = 0
+        hx_m = 0.0d0
+        hy_m = 0.0d0
+        hz_m = 0.0d0
+        nxvac_m = 0
+        nyvac_m = 0
+        nzvac_m = 0
         file_macropoint = ''
 
 

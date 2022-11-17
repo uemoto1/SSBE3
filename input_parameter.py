@@ -54,8 +54,8 @@ setting = [
         ("gamma", "real(8)", None, "5.0d-3"),
     ]),
     ("multiscale", [
-        ("fdtddim", "character(256)", None, ""),
-        ("twod_shape", "character(256)", None, ""),
+        ("fdtddim", "character(256)", None, "''"),
+        ("twod_shape", "character(256)", None, "''"),
         ("nx_m", "integer", None, "0"),
         ("ny_m", "integer", None, "0"),
         ("nz_m", "integer", None, "0"),
@@ -151,7 +151,7 @@ for group_name, group_data in setting:
 code_default = ""
 for group_name, group_data in setting:
     for var_name, var_type, var_dim, var_defval in group_data:
-        code_default = ind2 + "%s = %s\n" % (var_name, var_defval)
+        code_default += ind2 + "%s = %s\n" % (var_name, var_defval)
 
 code_rewind = ""
 for group_name, group_data in setting:

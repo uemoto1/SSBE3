@@ -12,13 +12,15 @@ program main
     type(s_sbe_gs) :: gs
     real(8) :: t,  E(3), jmat(3)
     real(8), allocatable :: Ac_ext_t(:, :)
-    integer :: it, i
+    integer :: it, i, ikey
     real(8) :: energy0, energy
     real(8) :: tr_all, tr_vb
-    integer :: nproc, irank, ierr
-    integer :: nthread
-    integer, allocatable :: imacro_min_proc(:)
-    integer, allocatable :: imacro_max_proc(:)
+    integer :: nproc, irank, ierr, icomm_macro
+    integer :: nthread, nmacro_proc, nproc_macro
+    integer, allocatable :: itbl_macro_min(:)
+    integer, allocatable :: itbl_macro_max(:)
+    integer :: imacro_min, imacro_max
+    integer :: irank_macro, isize_macro
 
     call MPI_INIT(ierr)
     call MPI_COMM_SIZE(MPI_COMM_WORLD, nproc, ierr)
@@ -36,16 +38,48 @@ program main
         write(*, "(a,i6)") "# number of OMP threads=", nthread
     end if
 
-    ! Distribute
-    allocate(imacro_min_proc(1:nmacro))
-    allocate(imacro_max_proc(1:nmacro))
-
-    
-
-        
-        
-
     call read_input()
+
+    ! Distribute
+    allocate(itbl_macro_min(0:nproc-1))
+    allocate(itbl_macro_max(0:nproc-1))
+
+    if (nproc <= nmacro) then
+        if (mod(nmacro, nproc) == 0) then
+            nmacro_proc = nmacro / nproc
+            do i = 0, nproc-1
+                itbl_macro_min(i) = i * nmacro_proc + 1
+                itbl_macro_max(i) = itbl_macro_min(i) + (nmacro_proc - 1)
+            end do
+        else
+            call MPI_FINALIZE(ierr)
+            stop "ERROR: mod(nmacro, nproc) != 0"
+        end if
+    else
+        if (mod(nproc, nmacro) == 0) then
+            nproc_macro = nproc / nmacro
+            do i = 0, nproc-1
+                itbl_macro_min(i) = (i / nproc_macro) + 1
+                itbl_macro_max(i) = itbl_macro_min(i)
+            end do
+        else
+            call MPI_FINALIZE(ierr)
+            stop "ERROR: mod(nproc, nmacro) != 0"
+        end if
+    end if
+    if (irank == 0) then
+        do i = 0, nproc-1
+            write(*, "(a,i9,a,2i9)") "# rank=", i, " imacro=", itbl_macro_min(i), itbl_macro_max(i)
+        end do
+    end if
+    imacro_min = itbl_macro_min(irank)
+    imacro_max = itbl_macro_max(irank)
+    
+    call MPI_COMM_SPLIT(MPI_COMM_WORLD, imacro_min, 0, icomm_macro, ierr)
+    ! call MPI_COMM_RANK(icomm_macro, irank_macro, ierr)
+    ! call MPI_COMM_SIZE(icomm_macro, isize_macro, ierr)
+    ! write(*, *) irank, icomm_macro, irank_macro, isize_macro, imacro_min
+    ! stop "---"
 
     if (0.0d0 < al(1)) al_vec1(1:3) = (/ al(1), 0.0d0, 0.0d0 /)
     if (0.0d0 < al(2)) al_vec2(1:3) = (/ 0.0d0, al(2), 0.0d0 /)
@@ -57,23 +91,18 @@ program main
         & nkgrid, nstate, nelec, &
         & al_vec1, al_vec2, al_vec3, &
         & .false., MPI_COMM_WORLD)        
-    
 
-    ! Calculate dielectric spectra and save as SYSNAME_dielec.data:
-    if (trim(theory) == 'lr_dielec') then
-        if (irank == 0) call calc_dielec(sysname, base_directory, gs, nenergy, de, gamma)
-        stop
-    end if
+    ! stop "--"
 
 
     ! Initialization of SBE solver and density matrix:
-    call init_sbe(sbe, gs, nstate_sbe, MPI_COMM_WORLD)
+    call init_sbe(sbe, gs, nstate_sbe, icomm_macro)
 
     ! Prepare external pulse
     allocate(Ac_ext_t(1:3, -1:nt+1))
     call calc_Ac_ext_t(0.0d0, dt, 0, nt, Ac_ext_t)
 
-    energy0 = calc_energy(sbe, gs, Ac_ext_t(:, 0), MPI_COMM_WORLD)
+    energy0 = calc_energy(sbe, gs, Ac_ext_t(:, 0), icomm_macro)
 
     ! Realtime calculation
     if (irank == 0) then
@@ -100,10 +129,10 @@ program main
 
         if (mod(it, 10) == 0) then
             E(:) = (Ac_ext_t(:, it + 1) - Ac_ext_t(:, it - 1)) / (2 * dt)
-            call calc_current_bloch(sbe, gs, Ac_ext_t(:, it), Jmat, MPI_COMM_WORLD)
-            energy = calc_energy(sbe, gs, Ac_ext_t(:, it), MPI_COMM_WORLD)
-            tr_all = calc_trace(sbe, gs, nstate_sbe, MPI_COMM_WORLD)
-            tr_vb = calc_trace(sbe, gs, nelec / 2, MPI_COMM_WORLD)
+            call calc_current_bloch(sbe, gs, Ac_ext_t(:, it), Jmat, icomm_macro)
+            energy = calc_energy(sbe, gs, Ac_ext_t(:, it), icomm_macro)
+            tr_all = calc_trace(sbe, gs, nstate_sbe, icomm_macro)
+            tr_vb = calc_trace(sbe, gs, nelec / 2, icomm_macro)
             
             if (irank == 0) then
                 write(100, '(f12.6,15(es24.15e3))') t, Ac_ext_t(:, it), E(:), Ac_ext_t(:, it), E(:), Jmat(:)
@@ -111,6 +140,8 @@ program main
                 write(102, '(f12.6,2(es24.15e3))') t, tr_all - tr_vb, nelec - tr_vb 
                 write(*, '(f12.6,es24.15e3)') t, tr_all
             end if
+
+            write(1000+irank, '(f12.6,15(es24.15e3))') t, Ac_ext_t(:, it), E(:), Ac_ext_t(:, it), E(:), Jmat(:)
         end if
 
     end do
