@@ -1,5 +1,5 @@
 module sbe_solver
-    use salmon_math, only: pi
+    use math_constants, only: pi
     use sbe_gs
     implicit none
 
@@ -20,6 +20,7 @@ contains
 
 subroutine init_sbe(sbe, gs, nb_sbe, icomm)
     use mpi
+    ! use tool
     implicit none
     type(s_sbe_bloch_solver), intent(inout) :: sbe
     type(s_sbe_gs), intent(in) :: gs
@@ -33,6 +34,7 @@ subroutine init_sbe(sbe, gs, nb_sbe, icomm)
     sbe%nk = gs%nk
     sbe%nb = nb_sbe
 
+    if (sbe%nk < nproc) stop "ERROR: nk is too small!"
     nk_proc = (sbe%nk - 1) / nproc + 1
     sbe%ik_min = irank * nk_proc + 1
     sbe%ik_max = min(sbe%ik_min + nk_proc - 1, sbe%nk)
@@ -79,7 +81,7 @@ subroutine calc_current_bloch(sbe, gs, Ac, jmat, icomm)
     
     jtmp(1:3) = jtmp(1:3) / sum(gs%kweight(:))
 
-    jmat(:) = (real(jtmp(:)) + Ac * calc_trace(sbe, gs, sbe%nb, MPI_COMM_WORLD)) / gs%volume    
+    jmat(:) = (real(jtmp(:)) + Ac * calc_trace(sbe, gs, sbe%nb, icomm)) / gs%volume    
     !jmat(1:3) = (real(jtmp(1:3))) / gs%volume    
     return
 end subroutine calc_current_bloch

@@ -1,7 +1,7 @@
 ! Ground State Date Storage Module:
 
 module sbe_gs
-    use salmon_math, only: pi
+    use math_constants, only: pi
     implicit none
 
     type s_sbe_gs

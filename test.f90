@@ -4,7 +4,7 @@ module test
 
 subroutine calc_dielec(sysname, base_directory, gs, nenergy, de, gamma)
     use sbe_solver
-    use salmon_math, only: pi
+    use math_constants, only: pi
     use salmon_file, only: open_filehandle
     implicit none
     character(*), intent(in) :: sysname

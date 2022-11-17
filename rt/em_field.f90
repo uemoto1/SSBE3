@@ -85,7 +85,7 @@ contains
 
 Subroutine calc_Ac_ext_t(t0, delta_t, is, ie, Ac_ext_t)
   ! use math_constants,only: zi,pi
-  use salmon_math,only: zi,pi
+  use math_constants,only: zi,pi
   ! use salmon_global, only: I_wcm2_1,I_wcm2_2,E_amplitude1,E_amplitude2,ae_shape1,ae_shape2, &
   !                        & epdir_re1,epdir_re2,epdir_im1,epdir_im2,tw1,tw2,t1_start,omega1,omega2, &
   !                        & phi_CEP1,phi_CEP2,T1_T2,e_impulse,file_input1

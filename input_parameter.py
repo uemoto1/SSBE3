@@ -63,10 +63,15 @@ setting = [
         ("hx_m", "real(8)", None, "0.0d0"),
         ("hy_m", "real(8)", None, "0.0d0"),
         ("hz_m", "real(8)", None, "0.0d0"),
-        ("nxvac_m", "integer", None, "0"),
-        ("nyvac_m", "integer", None, "0"),
-        ("nzvac_m", "integer", None, "0"),
+        ("nxvac_m", "integer", 2, "0"),
+        ("nyvac_m", "integer", 2, "0"),
+        ("nzvac_m", "integer", 2, "0"),
         ("file_macropoint", "character(256)", None, "''"),
+        ("file_epsilon", "character(256)", None, "''"),
+        ("out_ms_ix", "integer", 2, "(/-1000000, 1000000/)"),
+        ("out_ms_iy", "integer", 2, "(/-1000000, 1000000/)"),
+        ("out_ms_iz", "integer", 2, "(/-1000000, 1000000/)"),
+        ("out_ms_it", "integer", 2, "(/-1000000, 1000000/)"),
     ]),
 ]
 
@@ -75,7 +80,7 @@ setting = [
 
 
 
-
+import os
 
 
 template = r"""! This file is automatically created by {PROGRAM}
@@ -161,9 +166,9 @@ code_dump = ""
 for group_name, group_data in setting:
     for var_name, var_type, var_dim, var_defval in group_data:
         if var_type.startswith("character"):
-            code_dump += ind3 + "write(*,'(a,a)') '%s: %s = ', trim(%s)\n" % (group_name, var_name, var_name)
+            code_dump += ind3 + "write(*,'(a,a)') '# %s: %s = ', trim(%s)\n" % (group_name, var_name, var_name)
         else:
-            code_dump += ind3 + "write(*,'(a,99%s)') '%s: %s = ', %s\n" % (tbl_fmt[var_type], group_name, var_name, var_name)
+            code_dump += ind3 + "write(*,'(a,99%s)') '# %s: %s = ', %s\n" % (tbl_fmt[var_type], group_name, var_name, var_name)
 
 code_bcast = ""
 for group_name, group_data in setting:
@@ -179,12 +184,17 @@ for group_name, group_data in setting:
             mpi_type = tbl_mpi[var_type]
         code_bcast += ind2 + "call MPI_BCAST(%s, %s, %s, MPI_COMM_WORLD, 0, ierr)\n" % (var_name, mpi_len, mpi_type)
 
-print(template.format(
-    PROGRAM=__file__.split("/")[-1],
-    CODE_DEFINE=code_define,
-    CODE_NAMELIST=code_namelist,
-    CODE_DEFAULT=code_default,
-    CODE_REWIND=code_rewind,
-    CODE_DUMP=code_dump,
-    CODE_BCAST=code_bcast,
-))
+program = os.path.split(__file__)[-1]
+f90file = os.path.splitext(__file__)[0] + ".f90"
+
+with open(f90file, "w") as fh:
+    fh.write(template.format(
+        PROGRAM=program,
+        CODE_DEFINE=code_define,
+        CODE_NAMELIST=code_namelist,
+        CODE_DEFAULT=code_default,
+        CODE_REWIND=code_rewind,
+        CODE_DUMP=code_dump,
+        CODE_BCAST=code_bcast,
+    ))
+    print("Exported: %s" % fh.name)

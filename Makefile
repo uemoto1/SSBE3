@@ -4,7 +4,8 @@ TARGET = SSBE
 
 OBJS = \
 misc/unusedvar.o \
-math/salmon_math.o \
+math/math_constants.o \
+math/phys_constants.o \
 io/salmon_file.o \
 common/structures.o \
 common/pack_unpack.o \
@@ -13,6 +14,7 @@ sbe_bloch_solver.o \
 test.o \
 input_parameter.o \
 rt/em_field.o \
+fdtd_weyl_gauge.o \
 main.o
 
 $(TARGET): $(OBJS)
