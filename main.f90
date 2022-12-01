@@ -1,3 +1,36 @@
+! Almost equally split integer n over array of size m...
+subroutine split_num(n, m, ntbl)
+    implicit none
+    integer, intent(in) :: n
+    integer, intent(in) :: m
+    integer, intent(out) :: ntbl(m)
+    integer :: ntmp, itmp
+    ntmp = n / m
+    itmp = mod(n, m)
+    ntbl(1:itmp) = ntmp + 1
+    ntbl(itmp+1:m) = ntmp
+    return
+end subroutine split_num
+
+! Almost equally split range of imin:imax to m sub-regions...
+subroutine split_range(imin, imax, m, itbl_min, itbl_max)
+    implicit none
+    integer, intent(in) :: imin
+    integer, intent(in) :: imax
+    integer, intent(in) :: m
+    integer, intent(out) :: itbl_min(m)
+    integer, intent(out) :: itbl_max(m)
+    integer :: ntbl(m), itmp, i
+    call split_num(imax-imin+1, m, ntbl)
+    itmp = imin
+    do i = 1, m
+        itbl_min(i) = itmp
+        itmp = itmp + ntbl(i)
+        itbl_max(i) = itmp - 1
+    end do
+    return
+end subroutine split_range
+
 program main
     use mpi
     use omp_lib
@@ -23,6 +56,13 @@ program main
     integer :: nthread, nmacro_proc, nproc_macro
     integer, allocatable :: itbl_macro_min(:)
     integer, allocatable :: itbl_macro_max(:)
+    integer, allocatable :: itbl_proc_min(:)
+    integer, allocatable :: itbl_proc_max(:)
+    real(8), allocatable :: vec_Ac_macro(:, :)
+    real(8), allocatable :: vec_Jem_macro(:, :)
+    integer, parameter :: nmacro_max = 10000
+    integer :: nmacro, imacro, itype
+    integer :: itbl_macro_coord(3, nmacro_max)
     integer :: imacro_min, imacro_max
     integer :: irank_macro
     real(8) :: x, r_it, w, rtmp
@@ -51,61 +91,7 @@ program main
 
     call read_input()
 
-    if (0.0d0 < al(1)) al_vec1(1:3) = (/ al(1), 0.0d0, 0.0d0 /)
-    if (0.0d0 < al(2)) al_vec2(1:3) = (/ 0.0d0, al(2), 0.0d0 /)
-    if (0.0d0 < al(3)) al_vec3(1:3) = (/ 0.0d0, 0.0d0, al(3) /)
-    if (nstate_sbe < 1) nstate_sbe = nstate
-
-    ! Read ground state electronic system:
-    call init_sbe_gs(gs, sysname, gs_directory, &
-        & nkgrid, nstate, nelec, &
-        & al_vec1, al_vec2, al_vec3, &
-        & .false., MPI_COMM_WORLD)        
-
-    ! Distribute
-    allocate(itbl_macro_min(0:nproc-1))
-    allocate(itbl_macro_max(0:nproc-1))
-    if (nmacro > 0) then
-        if (nproc <= nmacro) then
-            if (mod(nmacro, nproc) == 0) then
-                nmacro_proc = nmacro / nproc
-                do i = 0, nproc-1
-                    itbl_macro_min(i) = i * nmacro_proc + 1
-                    itbl_macro_max(i) = itbl_macro_min(i) + (nmacro_proc - 1)
-                end do
-            else
-                call MPI_FINALIZE(ierr)
-                stop "ERROR: mod(nmacro, nproc) != 0"
-            end if
-        else
-            if (mod(nproc, nmacro) == 0) then
-                nproc_macro = nproc / nmacro
-                do i = 0, nproc-1
-                    itbl_macro_min(i) = (i / nproc_macro) + 1
-                    itbl_macro_max(i) = itbl_macro_min(i)
-                end do
-            else
-                call MPI_FINALIZE(ierr)
-                stop "ERROR: mod(nproc, nmacro) != 0"
-            end if
-        end if
-
-        if (irank == 0) then
-            do i = 0, nproc-1
-                write(*, "(a,i9,a,2i9)") "# rank=", i, " imacro=", itbl_macro_min(i), itbl_macro_max(i)
-            end do
-        end if
-        imacro_min = itbl_macro_min(irank)
-        imacro_max = itbl_macro_max(irank)
-        call MPI_COMM_SPLIT(MPI_COMM_WORLD, imacro_min, 0, icomm_macro, ierr)
-        call MPI_COMM_RANK(icomm_macro, irank_macro, ierr)    
-        allocate(sbe(imacro_min:imacro_max))
-        ! Initialization of SBE solver and density matrix:
-        do i = imacro_min, imacro_max
-            call init_sbe(sbe(i), gs, nstate_sbe, icomm_macro)
-        end do    
-    end if
-
+    ! FDTD setup
     fs%mg%nd = 1
     fs%mg%is(1) = 1 - abs(nxvac_m(1))
     fs%mg%ie(1) = nx_m + abs(nxvac_m(2))
@@ -118,32 +104,99 @@ program main
     fs%hgs(1:3) = (/ hx_m, hy_m, hz_m /)
     fw%dt = dt
 
-    ! Prepare external pulse
-    mt = max(nt, int(abs(nxvac_m(1)) * fs%hgs(1) / cspeed_au / dt))
-
-    allocate(Ac_ext_t(1:3, -1:mt+1))
-    call calc_Ac_ext_t(0.0d0, dt, 0, mt, Ac_ext_t)    
-
     if (irank == 0) then
         call weyl_init(fs, fw)
 
-        if (len_trim(file_epsilon) > 0) then
-            open(99, file=trim(file_epsilon), action="read")
+        imacro = 0
+        if (len_trim(file_ms_shape) > 0) then
+            open(99, file=trim(file_ms_shape), action="read")
             read(99, *) n
             do i = 1, n
-                read(99, *) j, ix, iy, iz, rtmp
-                if (ix < fs%mg%is(1)) stop "invalid ix"
-                if (iy < fs%mg%is(2)) stop "invalid ix"
-                if (iz < fs%mg%is(3)) stop "invalid ix"
-                if (ix > fs%mg%ie(1)) stop "invalid ix"
-                if (iy > fs%mg%ie(2)) stop "invalid ix"
-                if (iz > fs%mg%ie(3)) stop "invalid ix"
-                fw%epsilon%f(ix, iy, iz) = rtmp
-                ! write(*, *) "K", ix, iy, iz, rtmp, fw%epsilon%f(ix, iy, iz)
+                read(99, *) ix, iy, iz, itype
+                if (ix < 1) stop "Error: invalid range!"
+                if (iy < 1) stop "Error: invalid range!"
+                if (iz < 1) stop "Error: invalid range!"
+                if (ix > nx_m) stop "Error: invalid range!"
+                if (iy > ny_m) stop "Error: invalid range!"
+                if (iz > nz_m) stop "Error: invalid range!"
+                if (itype > 0) then
+                    fw%epsilon%f(ix, iy, iz) = epsilon_em(itype)
+                else if (itype == 0) then
+                    fw%epsilon%f(ix, iy, iz) = 1.0d0
+                else
+                    imacro = imacro + 1
+                    if (imacro > nmacro_max) stop "Error: number of macropoints is too large!" 
+                    itbl_macro_coord(1:3, imacro) = (/ ix, iy, iz /)
+                end if
             end do
             close(99)
+        else
+            do iz = 1, nz_m
+            do iy = 1, ny_m
+            do ix = 1, nx_m
+                imacro = imacro + 1
+                if (imacro > nmacro_max) stop "Error: number of macropoints is too large!" 
+                itbl_macro_coord(1:3, imacro) = (/ ix, iy, iz /)
+            end do
+            end do
+            end do
         end if
+        nmacro = imacro
     end if
+    call  MPI_BCAST(nmacro, 1, MPI_INTEGER, MPI_COMM_WORLD, 0, ierr)
+    call  MPI_BCAST(itbl_macro_coord, 3*nmacro_max, MPI_INTEGER, MPI_COMM_WORLD, 0, ierr)
+    allocate(vec_Ac_macro(1:3, nmacro), vec_Jem_macro(1:3, nmacro))
+ 
+    if (nmacro > 0) then
+        if (0.0d0 < al(1)) al_vec1(1:3) = (/ al(1), 0.0d0, 0.0d0 /)
+        if (0.0d0 < al(2)) al_vec2(1:3) = (/ 0.0d0, al(2), 0.0d0 /)
+        if (0.0d0 < al(3)) al_vec3(1:3) = (/ 0.0d0, 0.0d0, al(3) /)
+        if (nstate_sbe < 1) nstate_sbe = nstate
+
+        ! Distribute
+        allocate(itbl_macro_min(0:nproc-1))
+        allocate(itbl_macro_max(0:nproc-1))
+        allocate(itbl_proc_min(1:nmacro))
+        allocate(itbl_proc_max(1:nmacro))
+
+        if (nproc <= nmacro) then
+            call split_range(1, nmacro, nproc, itbl_macro_min, itbl_macro_max)
+        else
+            call split_range(0, nproc-1, nmacro, itbl_proc_min, itbl_proc_max)
+            do imacro = 1, nmacro
+                itbl_macro_min(itbl_proc_min(imacro):itbl_proc_max(imacro)) = imacro
+                itbl_macro_max(itbl_proc_min(imacro):itbl_proc_max(imacro)) = imacro
+            end do
+        end if
+
+        if (irank == 0) then
+            do i = 0, nproc-1
+                write(*, "(a,i9,a,2i9)") "# rank=", i, " imacro=", itbl_macro_min(i), itbl_macro_max(i)
+            end do
+        end if
+
+        imacro_min = itbl_macro_min(irank)
+        imacro_max = itbl_macro_max(irank)
+        call MPI_COMM_SPLIT(MPI_COMM_WORLD, imacro_min, 0, icomm_macro, ierr)
+        call MPI_COMM_RANK(icomm_macro, irank_macro, ierr)  
+
+        
+        ! Read ground state electronic system:
+        call init_sbe_gs(gs, sysname, gs_directory, &
+            & nkgrid, nstate, nelec, &
+            & al_vec1, al_vec2, al_vec3, &
+            & .false., MPI_COMM_WORLD)
+        ! Initialization of SBE solver and density matrix:
+        allocate(sbe(imacro_min:imacro_max))
+        do i = imacro_min, imacro_max
+            call init_sbe(sbe(i), gs, nstate_sbe, icomm_macro)
+        end do    
+    end if
+
+    ! Prepare external pulse
+    mt = max(nt, int(abs(nxvac_m(1)) * fs%hgs(1) / cspeed_au / dt))
+    allocate(Ac_ext_t(1:3, -1:mt+1))
+    call calc_Ac_ext_t(0.0d0, dt, 0, mt, Ac_ext_t)    
 
     do ix = fs%mg%is_array(1), 0
         do iy = fs%mg%is_array(2), fs%mg%ie_array(2)
@@ -166,7 +219,6 @@ program main
     end do
 
 
-
     if (nmacro > 0) then
         do i = imacro_min, imacro_max
             energy0 = calc_energy(sbe(i), gs, Ac_ext_t(:, 0), icomm_macro)
@@ -183,9 +235,6 @@ program main
             end do
         end if
     end if
-
-    write(*,*) fs%mg%is(1), out_ms_ix(1), fs%mg%ie(1), out_ms_ix(2)
-    write(*,*) max(fs%mg%is(1), out_ms_ix(1)), min(fs%mg%ie(1), out_ms_ix(2))
 
     do it = 1, nt
         t = dt * it

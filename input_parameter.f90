@@ -45,19 +45,19 @@ module input_parameter
     integer :: nx_m
     integer :: ny_m
     integer :: nz_m
-    integer :: nmacro
     real(8) :: hx_m
     real(8) :: hy_m
     real(8) :: hz_m
     integer :: nxvac_m(2)
     integer :: nyvac_m(2)
     integer :: nzvac_m(2)
-    character(256) :: file_macropoint
-    character(256) :: file_epsilon
+    character(256) :: file_ms_shape
     integer :: out_ms_ix(2)
     integer :: out_ms_iy(2)
     integer :: out_ms_iz(2)
     integer :: out_ms_it(2)
+    integer :: media_num
+    real(8) :: epsilon_em(9)
 
 
 contains
@@ -119,19 +119,20 @@ contains
         & nx_m, &
         & ny_m, &
         & nz_m, &
-        & nmacro, &
         & hx_m, &
         & hy_m, &
         & hz_m, &
         & nxvac_m, &
         & nyvac_m, &
         & nzvac_m, &
-        & file_macropoint, &
-        & file_epsilon, &
+        & file_ms_shape, &
         & out_ms_ix, &
         & out_ms_iy, &
         & out_ms_iz, &
         & out_ms_it
+        namelist/maxwell/ &
+        & media_num, &
+        & epsilon_em
 
 
         theory = 'perturb_dielec'
@@ -177,19 +178,19 @@ contains
         nx_m = 0
         ny_m = 0
         nz_m = 0
-        nmacro = 0
         hx_m = 0.0d0
         hy_m = 0.0d0
         hz_m = 0.0d0
         nxvac_m = 0
         nyvac_m = 0
         nzvac_m = 0
-        file_macropoint = ''
-        file_epsilon = ''
+        file_ms_shape = ''
         out_ms_ix = (/-1000000, 1000000/)
         out_ms_iy = (/-1000000, 1000000/)
         out_ms_iz = (/-1000000, 1000000/)
         out_ms_it = (/-1000000, 1000000/)
+        media_num = 0
+        epsilon_em = 1.0d0
 
 
         call MPI_COMM_RANK(MPI_COMM_WORLD, irank, ierr)
@@ -211,6 +212,7 @@ contains
             rewind(99); read(99, nml=emfield, iostat=ret)
             rewind(99); read(99, nml=analysis, iostat=ret)
             rewind(99); read(99, nml=multiscale, iostat=ret)
+            rewind(99); read(99, nml=maxwell, iostat=ret)
 
             close(99)
             write(*,'(a,a)') '# calculation: theory = ', trim(theory)
@@ -256,19 +258,19 @@ contains
             write(*,'(a,99i9)') '# multiscale: nx_m = ', nx_m
             write(*,'(a,99i9)') '# multiscale: ny_m = ', ny_m
             write(*,'(a,99i9)') '# multiscale: nz_m = ', nz_m
-            write(*,'(a,99i9)') '# multiscale: nmacro = ', nmacro
             write(*,'(a,99es25.15e3)') '# multiscale: hx_m = ', hx_m
             write(*,'(a,99es25.15e3)') '# multiscale: hy_m = ', hy_m
             write(*,'(a,99es25.15e3)') '# multiscale: hz_m = ', hz_m
             write(*,'(a,99i9)') '# multiscale: nxvac_m = ', nxvac_m
             write(*,'(a,99i9)') '# multiscale: nyvac_m = ', nyvac_m
             write(*,'(a,99i9)') '# multiscale: nzvac_m = ', nzvac_m
-            write(*,'(a,a)') '# multiscale: file_macropoint = ', trim(file_macropoint)
-            write(*,'(a,a)') '# multiscale: file_epsilon = ', trim(file_epsilon)
+            write(*,'(a,a)') '# multiscale: file_ms_shape = ', trim(file_ms_shape)
             write(*,'(a,99i9)') '# multiscale: out_ms_ix = ', out_ms_ix
             write(*,'(a,99i9)') '# multiscale: out_ms_iy = ', out_ms_iy
             write(*,'(a,99i9)') '# multiscale: out_ms_iz = ', out_ms_iz
             write(*,'(a,99i9)') '# multiscale: out_ms_it = ', out_ms_it
+            write(*,'(a,99i9)') '# maxwell: media_num = ', media_num
+            write(*,'(a,99es25.15e3)') '# maxwell: epsilon_em = ', epsilon_em
 
         end if
         call MPI_BCAST(theory, 256, MPI_CHARACTER, MPI_COMM_WORLD, 0, ierr)
@@ -314,19 +316,19 @@ contains
         call MPI_BCAST(nx_m, 1, MPI_INTEGER, MPI_COMM_WORLD, 0, ierr)
         call MPI_BCAST(ny_m, 1, MPI_INTEGER, MPI_COMM_WORLD, 0, ierr)
         call MPI_BCAST(nz_m, 1, MPI_INTEGER, MPI_COMM_WORLD, 0, ierr)
-        call MPI_BCAST(nmacro, 1, MPI_INTEGER, MPI_COMM_WORLD, 0, ierr)
         call MPI_BCAST(hx_m, 1, MPI_DOUBLE_PRECISION, MPI_COMM_WORLD, 0, ierr)
         call MPI_BCAST(hy_m, 1, MPI_DOUBLE_PRECISION, MPI_COMM_WORLD, 0, ierr)
         call MPI_BCAST(hz_m, 1, MPI_DOUBLE_PRECISION, MPI_COMM_WORLD, 0, ierr)
         call MPI_BCAST(nxvac_m, 2, MPI_INTEGER, MPI_COMM_WORLD, 0, ierr)
         call MPI_BCAST(nyvac_m, 2, MPI_INTEGER, MPI_COMM_WORLD, 0, ierr)
         call MPI_BCAST(nzvac_m, 2, MPI_INTEGER, MPI_COMM_WORLD, 0, ierr)
-        call MPI_BCAST(file_macropoint, 256, MPI_CHARACTER, MPI_COMM_WORLD, 0, ierr)
-        call MPI_BCAST(file_epsilon, 256, MPI_CHARACTER, MPI_COMM_WORLD, 0, ierr)
+        call MPI_BCAST(file_ms_shape, 256, MPI_CHARACTER, MPI_COMM_WORLD, 0, ierr)
         call MPI_BCAST(out_ms_ix, 2, MPI_INTEGER, MPI_COMM_WORLD, 0, ierr)
         call MPI_BCAST(out_ms_iy, 2, MPI_INTEGER, MPI_COMM_WORLD, 0, ierr)
         call MPI_BCAST(out_ms_iz, 2, MPI_INTEGER, MPI_COMM_WORLD, 0, ierr)
         call MPI_BCAST(out_ms_it, 2, MPI_INTEGER, MPI_COMM_WORLD, 0, ierr)
+        call MPI_BCAST(media_num, 1, MPI_INTEGER, MPI_COMM_WORLD, 0, ierr)
+        call MPI_BCAST(epsilon_em, 9, MPI_DOUBLE_PRECISION, MPI_COMM_WORLD, 0, ierr)
 
 
     end subroutine read_input

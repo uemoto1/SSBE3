@@ -29,6 +29,7 @@ module fdtd_weyl
         type(s_vector) :: vec_Ac        ! itt step
         type(s_vector) :: vec_Ac_old    ! itt-1 step
         type(s_scalar) :: epsilon
+        type(s_scalar) :: sigma
         ! type(s_scalar) :: edensity_emfield
         ! type(s_scalar) :: edensity_absorb
         ! character(16) :: fdtddim
@@ -52,6 +53,7 @@ contains
         call allocate_vector(fs%mg, fw%vec_h)
         call allocate_vector(fs%mg, fw%vec_j_em)
         call allocate_scalar(fs%mg, fw%epsilon)
+        call allocate_scalar(fs%mg, fw%sigma)
         ! call allocate_scalar(fs%mg, fw%edensity_emfield)
         ! call allocate_scalar(fs%mg, fw%edensity_absorb)
 
@@ -285,44 +287,44 @@ contains
 
                 ! Calculate Rot Rot A
                 rot2_Ac(1) = - (r_inv_h(2)**2) * fw%vec_Ac%v(1, i1+0, i2-1, i3+0) &
-                & - (r_inv_h(3)**2) * fw%vec_Ac%v(1, i1+0, i2+0, i3-1) &
-                & + (2d0* (r_inv_h(2)**2 + r_inv_h(3)**2)) * fw%vec_Ac%v(1, i1+0, i2+0, i3+0) &
-                & - (r_inv_h(3)**2) * fw%vec_Ac%v(1, i1+0, i2+0, i3+1) &
-                & - (r_inv_h(2)**2) * fw%vec_Ac%v(1, i1+0, i2+1, i3+0) &
-                & + (r_inv_h(1) * r_inv_h(2) * 0.25d0) * fw%vec_Ac%v(2, i1-1, i2-1, i3+0) &
-                & - (r_inv_h(1) * r_inv_h(2) * 0.25d0) * fw%vec_Ac%v(2, i1-1, i2+1, i3+0) &
-                & - (r_inv_h(1) * r_inv_h(2) * 0.25d0) * fw%vec_Ac%v(2, i1+1, i2-1, i3+0) &
-                & + (r_inv_h(1) * r_inv_h(2) * 0.25d0) * fw%vec_Ac%v(2, i1+1, i2+1, i3+0) &
-                & + (r_inv_h(1) * r_inv_h(3) * 0.25d0) * fw%vec_Ac%v(3, i1-1, i2+0, i3-1) &
-                & - (r_inv_h(1) * r_inv_h(3) * 0.25d0) * fw%vec_Ac%v(3, i1-1, i2+0, i3+1) &
-                & - (r_inv_h(1) * r_inv_h(3) * 0.25d0) * fw%vec_Ac%v(3, i1+1, i2+0, i3-1) &
-                & + (r_inv_h(1) * r_inv_h(3) * 0.25d0) * fw%vec_Ac%v(3, i1+1, i2+0, i3+1)
+                    & - (r_inv_h(3)**2) * fw%vec_Ac%v(1, i1+0, i2+0, i3-1) &
+                    & + (2d0* (r_inv_h(2)**2 + r_inv_h(3)**2)) * fw%vec_Ac%v(1, i1+0, i2+0, i3+0) &
+                    & - (r_inv_h(3)**2) * fw%vec_Ac%v(1, i1+0, i2+0, i3+1) &
+                    & - (r_inv_h(2)**2) * fw%vec_Ac%v(1, i1+0, i2+1, i3+0) &
+                    & + (r_inv_h(1) * r_inv_h(2) * 0.25d0) * fw%vec_Ac%v(2, i1-1, i2-1, i3+0) &
+                    & - (r_inv_h(1) * r_inv_h(2) * 0.25d0) * fw%vec_Ac%v(2, i1-1, i2+1, i3+0) &
+                    & - (r_inv_h(1) * r_inv_h(2) * 0.25d0) * fw%vec_Ac%v(2, i1+1, i2-1, i3+0) &
+                    & + (r_inv_h(1) * r_inv_h(2) * 0.25d0) * fw%vec_Ac%v(2, i1+1, i2+1, i3+0) &
+                    & + (r_inv_h(1) * r_inv_h(3) * 0.25d0) * fw%vec_Ac%v(3, i1-1, i2+0, i3-1) &
+                    & - (r_inv_h(1) * r_inv_h(3) * 0.25d0) * fw%vec_Ac%v(3, i1-1, i2+0, i3+1) &
+                    & - (r_inv_h(1) * r_inv_h(3) * 0.25d0) * fw%vec_Ac%v(3, i1+1, i2+0, i3-1) &
+                    & + (r_inv_h(1) * r_inv_h(3) * 0.25d0) * fw%vec_Ac%v(3, i1+1, i2+0, i3+1)
                 rot2_Ac(2) = + (r_inv_h(1) * r_inv_h(2) * 0.25d0) * fw%vec_Ac%v(1, i1-1, i2-1, i3+0) &
-                & - (r_inv_h(1) * r_inv_h(2) * 0.25d0) * fw%vec_Ac%v(1, i1-1, i2+1, i3+0) &
-                & - (r_inv_h(1) * r_inv_h(2) * 0.25d0) * fw%vec_Ac%v(1, i1+1, i2-1, i3+0) &
-                & + (r_inv_h(1) * r_inv_h(2) * 0.25d0) * fw%vec_Ac%v(1, i1+1, i2+1, i3+0) &
-                & - (r_inv_h(1)**2) * fw%vec_Ac%v(2, i1-1, i2+0, i3+0) &
-                & - (r_inv_h(3)**2) * fw%vec_Ac%v(2, i1+0, i2+0, i3-1) &
-                & + (2d0* (r_inv_h(1)**2 + r_inv_h(3)**2)) * fw%vec_Ac%v(2, i1+0, i2+0, i3+0) &
-                & - (r_inv_h(3)**2) * fw%vec_Ac%v(2, i1+0, i2+0, i3+1) &
-                & - (r_inv_h(1)**2) * fw%vec_Ac%v(2, i1+1, i2+0, i3+0) &
-                & + (r_inv_h(2) * r_inv_h(3) * 0.25d0) * fw%vec_Ac%v(3, i1+0, i2-1, i3-1) &
-                & - (r_inv_h(2) * r_inv_h(3) * 0.25d0) * fw%vec_Ac%v(3, i1+0, i2-1, i3+1) &
-                & - (r_inv_h(2) * r_inv_h(3) * 0.25d0) * fw%vec_Ac%v(3, i1+0, i2+1, i3-1) &
-                & + (r_inv_h(2) * r_inv_h(3) * 0.25d0) * fw%vec_Ac%v(3, i1+0, i2+1, i3+1)
+                    & - (r_inv_h(1) * r_inv_h(2) * 0.25d0) * fw%vec_Ac%v(1, i1-1, i2+1, i3+0) &
+                    & - (r_inv_h(1) * r_inv_h(2) * 0.25d0) * fw%vec_Ac%v(1, i1+1, i2-1, i3+0) &
+                    & + (r_inv_h(1) * r_inv_h(2) * 0.25d0) * fw%vec_Ac%v(1, i1+1, i2+1, i3+0) &
+                    & - (r_inv_h(1)**2) * fw%vec_Ac%v(2, i1-1, i2+0, i3+0) &
+                    & - (r_inv_h(3)**2) * fw%vec_Ac%v(2, i1+0, i2+0, i3-1) &
+                    & + (2d0* (r_inv_h(1)**2 + r_inv_h(3)**2)) * fw%vec_Ac%v(2, i1+0, i2+0, i3+0) &
+                    & - (r_inv_h(3)**2) * fw%vec_Ac%v(2, i1+0, i2+0, i3+1) &
+                    & - (r_inv_h(1)**2) * fw%vec_Ac%v(2, i1+1, i2+0, i3+0) &
+                    & + (r_inv_h(2) * r_inv_h(3) * 0.25d0) * fw%vec_Ac%v(3, i1+0, i2-1, i3-1) &
+                    & - (r_inv_h(2) * r_inv_h(3) * 0.25d0) * fw%vec_Ac%v(3, i1+0, i2-1, i3+1) &
+                    & - (r_inv_h(2) * r_inv_h(3) * 0.25d0) * fw%vec_Ac%v(3, i1+0, i2+1, i3-1) &
+                    & + (r_inv_h(2) * r_inv_h(3) * 0.25d0) * fw%vec_Ac%v(3, i1+0, i2+1, i3+1)
                 rot2_Ac(3) = + (r_inv_h(1) * r_inv_h(3) * 0.25d0) * fw%vec_Ac%v(1, i1-1, i2+0, i3-1) &
-                & - (r_inv_h(1) * r_inv_h(3) * 0.25d0) * fw%vec_Ac%v(1, i1-1, i2+0, i3+1) &
-                & - (r_inv_h(1) * r_inv_h(3) * 0.25d0) * fw%vec_Ac%v(1, i1+1, i2+0, i3-1) &
-                & + (r_inv_h(1) * r_inv_h(3) * 0.25d0) * fw%vec_Ac%v(1, i1+1, i2+0, i3+1) &
-                & + (r_inv_h(2) * r_inv_h(3) * 0.25d0) * fw%vec_Ac%v(2, i1+0, i2-1, i3-1) &
-                & - (r_inv_h(2) * r_inv_h(3) * 0.25d0) * fw%vec_Ac%v(2, i1+0, i2-1, i3+1) &
-                & - (r_inv_h(2) * r_inv_h(3) * 0.25d0) * fw%vec_Ac%v(2, i1+0, i2+1, i3-1) &
-                & + (r_inv_h(2) * r_inv_h(3) * 0.25d0) * fw%vec_Ac%v(2, i1+0, i2+1, i3+1) &
-                & - (r_inv_h(1)**2) * fw%vec_Ac%v(3, i1-1, i2+0, i3+0) &
-                & - (r_inv_h(2)**2) * fw%vec_Ac%v(3, i1+0, i2-1, i3+0) &
-                & + (2d0 * (r_inv_h(1)**2 + r_inv_h(2)**2)) * fw%vec_Ac%v(3, i1+0, i2+0, i3+0) &
-                & - (r_inv_h(2)**2) * fw%vec_Ac%v(3, i1+0, i2+1, i3+0) &
-                & - (r_inv_h(1)**2) * fw%vec_Ac%v(3, i1+1, i2+0, i3+0)
+                    & - (r_inv_h(1) * r_inv_h(3) * 0.25d0) * fw%vec_Ac%v(1, i1-1, i2+0, i3+1) &
+                    & - (r_inv_h(1) * r_inv_h(3) * 0.25d0) * fw%vec_Ac%v(1, i1+1, i2+0, i3-1) &
+                    & + (r_inv_h(1) * r_inv_h(3) * 0.25d0) * fw%vec_Ac%v(1, i1+1, i2+0, i3+1) &
+                    & + (r_inv_h(2) * r_inv_h(3) * 0.25d0) * fw%vec_Ac%v(2, i1+0, i2-1, i3-1) &
+                    & - (r_inv_h(2) * r_inv_h(3) * 0.25d0) * fw%vec_Ac%v(2, i1+0, i2-1, i3+1) &
+                    & - (r_inv_h(2) * r_inv_h(3) * 0.25d0) * fw%vec_Ac%v(2, i1+0, i2+1, i3-1) &
+                    & + (r_inv_h(2) * r_inv_h(3) * 0.25d0) * fw%vec_Ac%v(2, i1+0, i2+1, i3+1) &
+                    & - (r_inv_h(1)**2) * fw%vec_Ac%v(3, i1-1, i2+0, i3+0) &
+                    & - (r_inv_h(2)**2) * fw%vec_Ac%v(3, i1+0, i2-1, i3+0) &
+                    & + (2d0 * (r_inv_h(1)**2 + r_inv_h(2)**2)) * fw%vec_Ac%v(3, i1+0, i2+0, i3+0) &
+                    & - (r_inv_h(2)**2) * fw%vec_Ac%v(3, i1+0, i2+1, i3+0) &
+                    & - (r_inv_h(1)**2) * fw%vec_Ac%v(3, i1+1, i2+0, i3+0)
 
                 fw%vec_Ac_new%v(:,i1, i2, i3) = &
                 & + 2 * fw%vec_Ac%v(:,i1, i2, i3) - fw%vec_Ac_old%v(:,i1, i2, i3) &
