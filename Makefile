@@ -3,18 +3,21 @@ include make.inc
 TARGET = SSBE 
 
 OBJS = \
-misc/unusedvar.o \
 math/math_constants.o \
 math/phys_constants.o \
+parallel/communication.o \
 io/salmon_file.o \
 common/structures.o \
 common/pack_unpack.o \
+util.o \
 sbe_gs.o \
 sbe_bloch_solver.o \
 test.o \
 input_parameter.o \
 rt/em_field.o \
-fdtd_weyl_gauge.o \
+maxwell/fdtd_weyl_gauge.o \
+realtime.o \
+multiscale.o \
 main.o
 
 $(TARGET): $(OBJS)

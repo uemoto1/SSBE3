@@ -1,6 +1,8 @@
 module sbe_solver
-    use math_constants, only: pi
     use sbe_gs
+    use math_constants, only: pi, zi
+    use communication, only: comm_get_groupinfo, comm_summation
+    use util, only: split_range
     implicit none
 
 
@@ -19,25 +21,26 @@ contains
 
 
 subroutine init_sbe(sbe, gs, nb_sbe, icomm)
-    use mpi
-    ! use tool
+    use util
+    use communication
     implicit none
     type(s_sbe_bloch_solver), intent(inout) :: sbe
     type(s_sbe_gs), intent(in) :: gs
     integer, intent(in) :: nb_sbe
     integer, intent(in) :: icomm
     integer :: ik, ib, nk_proc, irank, nproc, ierr
+    integer, allocatable :: itbl_min(:), itbl_max(:)
 
-    call MPI_COMM_SIZE(icomm, nproc, ierr)
-    call MPI_COMM_RANK(icomm, irank, ierr)
+    call comm_get_groupinfo(icomm, irank, nproc)
 
     sbe%nk = gs%nk
     sbe%nb = nb_sbe
 
-    if (sbe%nk < nproc) stop "ERROR: nk is too small!"
-    nk_proc = (sbe%nk - 1) / nproc + 1
-    sbe%ik_min = irank * nk_proc + 1
-    sbe%ik_max = min(sbe%ik_min + nk_proc - 1, sbe%nk)
+    allocate(itbl_min(0:nproc-1), itbl_max(0:nproc-1))
+
+    call split_range(1, sbe%nk, nproc, itbl_min, itbl_max)
+    sbe%ik_min = itbl_min(irank)
+    sbe%ik_max = itbl_max(irank)
 
     allocate(sbe%rho(1:sbe%nb, 1:sbe%nb, sbe%ik_min:sbe%ik_max))
     
@@ -51,7 +54,6 @@ end subroutine
 
 
 subroutine calc_current_bloch(sbe, gs, Ac, jmat, icomm)
-    use mpi
     implicit none
     type(s_sbe_bloch_solver), intent(in) :: sbe
     type(s_sbe_gs), intent(in) :: gs
@@ -59,17 +61,16 @@ subroutine calc_current_bloch(sbe, gs, Ac, jmat, icomm)
     real(8), intent(out) :: jmat(1:3)
     integer, intent(in) :: icomm
     integer :: ik, idir, ib, jb, ierr
-    complex(8) :: jtmp(1:3)
-    complex(8), parameter :: zI = dcmplx(0.0d0, 1.0d0)
+    complex(8) :: tmp1(1:3), tmp(1:3)
 
-    jtmp(1:3) = 0d0
+    tmp1(1:3) = 0d0
 
-    !$omp parallel do default(shared) private(ik,ib,jb,idir) reduction(+:jtmp)
+    !$omp parallel do default(shared) private(ik,ib,jb,idir) reduction(+:tmp1)
     do ik = sbe%ik_min, sbe%ik_max
         do idir = 1, 3
             do ib = 1, sbe%nb
                 do jb = 1, sbe%nb
-                    jtmp(idir) = jtmp(idir) + gs%kweight(ik) * sbe%rho(jb, ib, ik) * ( &
+                    tmp1(idir) = tmp1(idir) + gs%kweight(ik) * sbe%rho(jb, ib, ik) * ( &
                         & gs%p_matrix(ib, jb, idir, ik) & !+ zI * gs%rvnl_matrix(ib, jb, idir, ik) &
                         & )
                 end do
@@ -77,22 +78,13 @@ subroutine calc_current_bloch(sbe, gs, Ac, jmat, icomm)
         end do
     end do
     !$omp end parallel do
-    call MPI_ALLREDUCE(MPI_IN_PLACE, jtmp, 3, MPI_DOUBLE_COMPLEX, MPI_SUM, icomm, ierr)
-    
-    jtmp(1:3) = jtmp(1:3) / sum(gs%kweight(:))
+    call comm_summation(tmp1, tmp, 3, icomm)
 
-    jmat(:) = (real(jtmp(:)) + Ac * calc_trace(sbe, gs, sbe%nb, icomm)) / gs%volume    
-    !jmat(1:3) = (real(jtmp(1:3))) / gs%volume    
+    jmat(:) = (real(tmp(1:3)) / sum(gs%kweight(:)) &
+        & + Ac * calc_trace(sbe, gs, sbe%nb, icomm)) / gs%volume    
+
     return
 end subroutine calc_current_bloch
-
-
-
-
-
-
-
-
 
 
 subroutine dt_evolve_bloch(sbe, gs, Ac, dt)
@@ -162,53 +154,52 @@ contains
 end subroutine
 
 function calc_trace(sbe, gs, nb_max, icomm) result(tr)
-    use mpi
+    use communication
     implicit none
     type(s_sbe_bloch_solver), intent(in) :: sbe
     type(s_sbe_gs), intent(in) :: gs
     integer, intent(in) :: icomm
     integer, intent(in) :: nb_max
-    complex(8), parameter :: zi = dcmplx(0d0, 1d0)
-    integer :: ik, ib, ierr
-    real(8) :: tr, tr_tmp
-    tr_tmp = 0d0
-    !$omp parallel do default(shared) private(ik, ib) reduction(+: tr_tmp) collapse(2) 
+    real(8) :: tr
+
+    integer :: ik, ib
+    real(8) :: tmp, tmp1
+    
+    tmp1 = 0d0
+    !$omp parallel do default(shared) private(ik, ib) reduction(+: tmp1) collapse(2) 
     do ik = sbe%ik_min, sbe%ik_max
         do ib = 1, nb_max
-            tr_tmp = tr_tmp + real(sbe%rho(ib, ib, ik)) * gs%kweight(ik)
+            tmp1 = tmp1 + real(sbe%rho(ib, ib, ik)) * gs%kweight(ik)
         end do
     end do
     !$omp end parallel do
-    call MPI_ALLREDUCE(MPI_IN_PLACE, tr_tmp, 1, MPI_DOUBLE_PRECISION, MPI_SUM, icomm, ierr)
-    tr = tr_tmp / sum(gs%kweight)
+    call comm_summation(tmp1, tmp, icomm)
+    tr = tmp / sum(gs%kweight)
+    
     return
 end function calc_trace
 
 
 function calc_energy(sbe, gs, Ac, icomm) result(energy)
-    use mpi
     implicit none
     type(s_sbe_bloch_solver), intent(in) :: sbe
     type(s_sbe_gs), intent(in) :: gs
     integer, intent(in) :: icomm
     real(8), intent(in) :: Ac(1:3)
-    integer :: ik, ib, jb, idir, ierr
-    real(8) :: energy
+    integer :: ik, ib, jb, idir
+    real(8) :: tmp1, tmp, energy
     ! real(8) :: kvec(1:3)
-    energy = 0d0
-    !$omp parallel do default(shared) private(ik, ib, jb, idir) reduction(+: energy)
+    tmp1 = 0d0
+    !$omp parallel do default(shared) private(ik, ib, jb, idir) reduction(+: tmp1)
     do ik = sbe%ik_min, sbe%ik_max
-        ! kvec(1:3) = gs%kpoint(1, ik) * gs%b_matrix(1, 1:3) &
-        !     & + gs%kpoint(2, ik) * gs%b_matrix(2, 1:3) &
-        !     & + gs%kpoint(3, ik) * gs%b_matrix(3, 1:3)
         do ib = 1, sbe%nb
             do idir = 1, 3
                 do jb = 1, sbe%nb
-                    energy = energy &
+                    tmp1 = tmp1 &
                         & + Ac(idir) * real(sbe%rho(ib, jb, ik) * gs%p_matrix(jb, ib, idir, ik)) * gs%kweight(ik)
                 end do
             end do
-            energy = energy &
+            tmp1 = tmp1 &
                 & + real(sbe%rho(ib, ib, ik)) * ( &
                 & + gs%eigen(ib, ik) &
                 !& + dot_product(kvec(:), Ac(:))
@@ -217,8 +208,8 @@ function calc_energy(sbe, gs, Ac, icomm) result(energy)
         end do
     end do
     !$omp end parallel do
-    call MPI_ALLREDUCE(MPI_IN_PLACE, energy, 1, MPI_DOUBLE_PRECISION, MPI_SUM, icomm, ierr)
-    energy = energy / sum(gs%kweight)
+    call comm_summation(tmp1, tmp, icomm)
+    energy = tmp / sum(gs%kweight)
 
     return 
 end function calc_energy

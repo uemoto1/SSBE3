@@ -99,17 +99,18 @@ module input_parameter
 
 contains
 
-    subroutine read_input()
-        use mpi
+    subroutine read_input(icomm)
+        use communication
         implicit none
-        integer :: ret, irank, ierr
+        integer, intent(in) :: icomm
+        integer :: ret, irank, nproc, ierr
         character(256) :: tmp
 
 {CODE_NAMELIST}
 
 {CODE_DEFAULT}
 
-        call MPI_COMM_RANK(MPI_COMM_WORLD, irank, ierr)
+        call comm_get_groupinfo(icomm, irank, nproc)
 
         if (irank == 0) then
             open(99, file='.namelist.tmp', action='write')
@@ -181,16 +182,7 @@ for group_name, group_data in setting:
 code_bcast = ""
 for group_name, group_data in setting:
     for var_name, var_type, var_dim, var_defval in group_data:
-        if var_type.startswith("character"):
-            mpi_len = var_type.split("(")[1].split(")")[0]
-            mpi_type = "MPI_CHARACTER"
-        else:
-            if var_dim:
-                mpi_len = var_dim
-            else:
-                mpi_len = 1
-            mpi_type = tbl_mpi[var_type]
-        code_bcast += ind2 + "call MPI_BCAST(%s, %s, %s, MPI_COMM_WORLD, 0, ierr)\n" % (var_name, mpi_len, mpi_type)
+        code_bcast += ind2 + "call comm_bcast(%s, icomm, 0)\n" % (var_name)
 
 program = os.path.split(__file__)[-1]
 f90file = os.path.splitext(__file__)[0] + ".f90"

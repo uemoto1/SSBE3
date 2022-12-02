@@ -29,7 +29,6 @@ module fdtd_weyl
         type(s_vector) :: vec_Ac        ! itt step
         type(s_vector) :: vec_Ac_old    ! itt-1 step
         type(s_scalar) :: epsilon
-        type(s_scalar) :: sigma
         ! type(s_scalar) :: edensity_emfield
         ! type(s_scalar) :: edensity_absorb
         ! character(16) :: fdtddim
@@ -53,7 +52,6 @@ contains
         call allocate_vector(fs%mg, fw%vec_h)
         call allocate_vector(fs%mg, fw%vec_j_em)
         call allocate_scalar(fs%mg, fw%epsilon)
-        call allocate_scalar(fs%mg, fw%sigma)
         ! call allocate_scalar(fs%mg, fw%edensity_emfield)
         ! call allocate_scalar(fs%mg, fw%edensity_absorb)
 
@@ -284,7 +282,6 @@ contains
         do i3 = fs%mg%is(3), fs%mg%ie(3)
             do i2 = fs%mg%is(2), fs%mg%ie(2)
             do i1 = fs%mg%is(1), fs%mg%ie(1)
-
                 ! Calculate Rot Rot A
                 rot2_Ac(1) = - (r_inv_h(2)**2) * fw%vec_Ac%v(1, i1+0, i2-1, i3+0) &
                     & - (r_inv_h(3)**2) * fw%vec_Ac%v(1, i1+0, i2+0, i3-1) &

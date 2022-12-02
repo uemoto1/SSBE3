@@ -32,7 +32,7 @@ contains
 
 
 subroutine init_sbe_gs(gs, sysname, gs_directory, nkgrid, nb, ne, a1, a2, a3, read_bin, icomm)
-    use mpi
+    use communication
     use salmon_file, only: open_filehandle, get_filehandle
     implicit none
     type(s_sbe_gs), intent(inout) :: gs
@@ -44,9 +44,9 @@ subroutine init_sbe_gs(gs, sysname, gs_directory, nkgrid, nb, ne, a1, a2, a3, re
     real(8), intent(in) :: a1(1:3), a2(1:3), a3(1:3)
     logical, intent(in) :: read_bin
     integer, intent(in) :: icomm 
-    integer :: nk, irank, ierr
+    integer :: nk, irank, nproc
 
-    call MPI_COMM_RANK(icomm, irank, ierr)
+    call comm_get_groupinfo(icomm, irank, nproc)
 
     nk = nkgrid(1) * nkgrid(2) * nkgrid(3)
 
@@ -88,15 +88,16 @@ subroutine init_sbe_gs(gs, sysname, gs_directory, nkgrid, nb, ne, a1, a2, a3, re
             call save_sbe_gs_bin()
         end if
     end if
-    call MPI_BCAST(gs%kpoint, 3*nk, MPI_DOUBLE_PRECISION, icomm, 0, ierr)
-    call MPI_BCAST(gs%kweight, nk, MPI_DOUBLE_PRECISION, icomm, 0, ierr)
-    call MPI_BCAST(gs%eigen, nb*nk, MPI_DOUBLE_PRECISION, icomm, 0, ierr)
-    call MPI_BCAST(gs%occup, nb*nk, MPI_DOUBLE_PRECISION, icomm, 0, ierr)
-    call MPI_BCAST(gs%delta_omega, nb*nb*nk, MPI_DOUBLE_PRECISION, icomm, 0, ierr)
-    call MPI_BCAST(gs%p_matrix, nb*nb*3*nk, MPI_DOUBLE_COMPLEX, icomm, 0, ierr)
-    call MPI_BCAST(gs%d_matrix, nb*nb*3*nk, MPI_DOUBLE_COMPLEX, icomm, 0, ierr)
-    call MPI_BCAST(gs%tm_p_matrix, nb*nb*3*nk, MPI_DOUBLE_COMPLEX, icomm, 0, ierr)
-    call MPI_BCAST(gs%rvnl_matrix, nb*nb*3*nk, MPI_DOUBLE_COMPLEX, icomm, 0, ierr)
+    
+    call comm_bcast(gs%kpoint, icomm, 0)
+    call comm_bcast(gs%kweight, icomm, 0)
+    call comm_bcast(gs%eigen, icomm, 0)
+    call comm_bcast(gs%occup, icomm, 0)
+    call comm_bcast(gs%delta_omega, icomm, 0)
+    call comm_bcast(gs%p_matrix, icomm, 0)
+    call comm_bcast(gs%d_matrix, icomm, 0)
+    call comm_bcast(gs%tm_p_matrix, icomm, 0)
+    call comm_bcast(gs%rvnl_matrix, icomm, 0)
     
     !Calculate omega and d_matrix (neglecting diagonal part):
     if (irank == 0) write(*,*) "# prepare_matrix"
