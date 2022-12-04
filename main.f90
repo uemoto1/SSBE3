@@ -19,6 +19,7 @@ program main
 
     if (irank == 0) then
         write(*, "(a)") "# SSBE3"
+        write(*, "(a,x,a,x,a)") "# built:", __DATE__, __TIME__
         write(*, "(a)") "# -----"
         write(*, "(a)") "# Parallelization:"
         write(*, "(a,i6)") "# number of MPI processes=", nproc
@@ -28,9 +29,9 @@ program main
     call read_input(icomm)
 
     select case (trim(theory))
-    case ("rt_sbe")
+    case ("sbe_rt")
         call realtime_main(icomm)
-    case ("ms_sbe")
+    case ("sbe_ms")
         call multiscale_main(icomm)
     end select
 
