@@ -21,7 +21,7 @@ setting = [
         ("nstate_sbe", "integer", None, "0"),
     ]),
     ("kgrid", [
-        ("nkgrid", "integer", 3, "(/0, 0, 0/)"),
+        ("num_kgrid", "integer", 3, "(/0, 0, 0/)"),
     ]),
     ("tgrid", [
         ("nt", "integer", None, "1000"),

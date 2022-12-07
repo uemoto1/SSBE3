@@ -1,3 +1,0 @@
-FC=mpiifort
-FLAGS= -fpp -xCORE-AVX2 -qopenmp  
-LIBS=-mkl=cluster

@@ -15,7 +15,7 @@ module input_parameter
     integer :: nstate
     integer :: nelec
     integer :: nstate_sbe
-    integer :: nkgrid(3)
+    integer :: num_kgrid(3)
     integer :: nt
     real(8) :: dt
     real(8) :: e_impulse
@@ -86,7 +86,7 @@ contains
         & nelec, &
         & nstate_sbe
         namelist/kgrid/ &
-        & nkgrid
+        & num_kgrid
         namelist/tgrid/ &
         & nt, &
         & dt
@@ -149,7 +149,7 @@ contains
         nstate = 0
         nelec = 0
         nstate_sbe = 0
-        nkgrid = (/0, 0, 0/)
+        num_kgrid = (/0, 0, 0/)
         nt = 1000
         dt = 1.0d-2
         e_impulse = 0.0d0
@@ -229,7 +229,7 @@ contains
             write(*,'(a,99i9)') '# system: nstate = ', nstate
             write(*,'(a,99i9)') '# system: nelec = ', nelec
             write(*,'(a,99i9)') '# system: nstate_sbe = ', nstate_sbe
-            write(*,'(a,99i9)') '# kgrid: nkgrid = ', nkgrid
+            write(*,'(a,99i9)') '# kgrid: num_kgrid = ', num_kgrid
             write(*,'(a,99i9)') '# tgrid: nt = ', nt
             write(*,'(a,99es25.15e3)') '# tgrid: dt = ', dt
             write(*,'(a,99es25.15e3)') '# emfield: e_impulse = ', e_impulse
@@ -287,7 +287,7 @@ contains
         call comm_bcast(nstate, icomm, 0)
         call comm_bcast(nelec, icomm, 0)
         call comm_bcast(nstate_sbe, icomm, 0)
-        call comm_bcast(nkgrid, icomm, 0)
+        call comm_bcast(num_kgrid, icomm, 0)
         call comm_bcast(nt, icomm, 0)
         call comm_bcast(dt, icomm, 0)
         call comm_bcast(e_impulse, icomm, 0)

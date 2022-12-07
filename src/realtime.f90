@@ -29,7 +29,7 @@ subroutine realtime_main(icomm)
 
     ! Read ground state electronic system:
     call init_sbe_gs(gs, sysname, gs_directory, &
-        & nkgrid, nstate, nelec, &
+        & num_kgrid, nstate, nelec, &
         & al_vec1, al_vec2, al_vec3, &
         & .false., icomm)        
     
@@ -65,7 +65,7 @@ subroutine realtime_main(icomm)
         call dt_evolve_bloch(sbe, gs, Ac_ext_t(:, it), dt)
 
         if (mod(it, 10) == 0) then
-            E(:) = (Ac_ext_t(:, it + 1) - Ac_ext_t(:, it - 1)) / (2 * dt)
+            E(:) = -(Ac_ext_t(:, it + 1) - Ac_ext_t(:, it - 1)) / (2 * dt)
             call calc_current_bloch(sbe, gs, Ac_ext_t(:, it), Jmat, icomm)
             energy = calc_energy(sbe, gs, Ac_ext_t(:, it), icomm)
             tr_all = calc_trace(sbe, gs, nstate_sbe, icomm)

@@ -24,21 +24,21 @@ module sbe_gs
 
         !k-space grid and geometry information
         !NOTE: prepred for uniformally distributed k-grid....
-        integer :: nkgrid(1:3)
+        integer :: num_kgrid(1:3)
     end type
 
 
 contains
 
 
-subroutine init_sbe_gs(gs, sysname, gs_directory, nkgrid, nb, ne, a1, a2, a3, read_bin, icomm)
+subroutine init_sbe_gs(gs, sysname, gs_directory, num_kgrid, nb, ne, a1, a2, a3, read_bin, icomm)
     use communication
     use salmon_file, only: open_filehandle, get_filehandle
     implicit none
     type(s_sbe_gs), intent(inout) :: gs
     character(*), intent(in) :: sysname
     character(*), intent(in) :: gs_directory
-    integer, intent(in) :: nkgrid(1:3)
+    integer, intent(in) :: num_kgrid(1:3)
     integer, intent(in) :: nb
     integer, intent(in) :: ne
     real(8), intent(in) :: a1(1:3), a2(1:3), a3(1:3)
@@ -48,12 +48,12 @@ subroutine init_sbe_gs(gs, sysname, gs_directory, nkgrid, nb, ne, a1, a2, a3, re
 
     call comm_get_groupinfo(icomm, irank, nproc)
 
-    nk = nkgrid(1) * nkgrid(2) * nkgrid(3)
+    nk = num_kgrid(1) * num_kgrid(2) * num_kgrid(3)
 
     gs%nk = nk
     gs%nb = nb
     gs%ne = ne
-    gs%nkgrid(1:3) = nkgrid(1:3)
+    gs%num_kgrid(1:3) = num_kgrid(1:3)
 
     !Calculate b_matrix, volume_cell and volume_bz from a1..a3 vector.
     call calc_lattice_info()
