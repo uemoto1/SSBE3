@@ -115,6 +115,7 @@ subroutine multiscale_main(icomm)
                 call dt_evolve_bloch(sbe(imacro), gs, Ac_macro(1:3, imacro), dt)
                 call calc_current_bloch(sbe(imacro), gs, Ac_macro(1:3, imacro), Jmat_macro(1:3, imacro), icomm_macro)
                 fw%vec_j_em%v(:, ix, iy, iz) = -Jmat_macro(:, imacro)
+
                 if (mod(it, 10) == 0) then
                     if (irank_macro == 0) then
                         write(1000+imacro, '(f12.6,15(es24.15e3))') t, Ac_macro(1:3, imacro), fw%vec_e%v(1:3, ix, iy, iz), &
@@ -126,26 +127,8 @@ subroutine multiscale_main(icomm)
 
         call weyl_calc(fs, fw)
         
-        if (irank == 0) then
-            if ((mod(it, 100) == 0)) then
-                write(tmp, "(a,i6.6,a)") "test", it, ".txt"
-                open(999, file=trim(tmp), action="write")
-                write(999, "(a)") "# 1:ix 2:iy 3:iz 4:x 5:y 6:z 7:Acx 8:Acy " & 
-                // "9:Acz 10:Ex 11:Ey 12:Ez 13:Hx 14:Hy 15:Hz"
-                do iz = max(fs%mg%is(3), out_ms_iz(1)), min(fs%mg%ie(3), out_ms_iz(2))
-                do iy = max(fs%mg%is(2), out_ms_iy(1)), min(fs%mg%ie(2), out_ms_iy(2))
-                do ix = max(fs%mg%is(1), out_ms_ix(1)), min(fs%mg%ie(1), out_ms_ix(2))
-                    write(999, "(3i9,3f15.3,99es25.15e4)") &
-                    ix, iy, iz, &
-                    ix*fs%hgs(1), iy*fs%hgs(2), iz*fs%hgs(3), &
-                    fw%vec_Ac%v(:, ix, iy, iz), &
-                    fw%vec_e%v(:, ix, iy, iz), &
-                    fw%vec_h%v(:, ix, iy, iz)
-                end do
-                end do
-                end do
-                close(999)
-            end if
+        if ((mod(it, 100) == 0)) then
+            if (irank == 0) call write_Ac_field(it, fs, fw)
         end if
     end do
 
@@ -280,5 +263,59 @@ subroutine set_incident_field(mt, Ac, fs, fw)
         end do
     end do
 end subroutine set_incident_field
+
+subroutine write_Ac_field(iit, fs, fw)
+    use input_parameter, only: sysname, out_ms_ix, out_ms_iy, out_ms_iz
+    use fdtd_weyl, only: s_fdtd_system, ls_fdtd_weyl
+    use phys_constants, only: cspeed_au
+    implicit none
+    integer, intent(in) :: iit
+    character(256) :: file_Ac_data
+    type(s_fdtd_system), intent(in) :: fs
+    type(ls_fdtd_weyl), intent(in) :: fw
+    integer :: ix, iy, iz
+
+    write(file_Ac_data, "(a, a,i6.6,a)") sysname, "_Ac_", iit, ".data"
+    open(999, file=trim(file_Ac_data), action="write")
+    write(999, '(a)') "# Multiscale TDDFT calculation"
+    write(999, '(a)') "# IX, IY, IZ: FDTD Grid index"
+    write(999, '(a)') "# x, y, z: Coordinates"
+    write(999, '(a)') "# Ac: Vector potential field"
+    write(999, '(a)') "# E: Electric field"
+    write(999, '(a)') "# J_em: Electromagnetic current density"
+    write(999, '("#",99(1X,I0,":",A,"[",A,"]"))') &
+        & 1, "IX", "none", &
+        & 2, "IY", "none", &
+        & 3, "IZ", "none", &
+        & 4, "Ac_x", "[au]", &
+        & 5, "Ac_y", "[au]", &
+        & 6, "Ac_z", "[au]", &
+        & 7, "E_x", "[au]", &
+        & 8, "E_y", "[au]", &
+        & 9, "E_z", "[au]", &
+        & 10, "B_x", "a.u.", &
+        & 11, "B_y", "a.u.", &
+        & 12, "B_z", "a.u.", &
+        & 13, "Jem_x", "[au]", &
+        & 14, "Jem_y", "[au]", &
+        & 15, "Jem_z", "[au]", &
+        & 16, "E_em", "[au]" // "/vol", &
+        & 17, "E_abs", "[au]" //  "/vol"
+    do iz = max(fs%mg%is(3), out_ms_iz(1)), min(fs%mg%ie(3), out_ms_iz(2))
+    do iy = max(fs%mg%is(2), out_ms_iy(1)), min(fs%mg%ie(2), out_ms_iy(2))
+    do ix = max(fs%mg%is(1), out_ms_ix(1)), min(fs%mg%ie(1), out_ms_ix(2))
+        write(999, "(3i9,99es25.15e4)") &
+        ix, iy, iz, &
+        fw%vec_Ac%v(:, ix, iy, iz), &
+        fw%vec_e%v(:, ix, iy, iz), &
+        fw%vec_h%v(:, ix, iy, iz), &
+        fw%vec_j_em%v(:, ix, iy, iz)
+    end do
+    end do
+    end do
+    close(999)
+end subroutine write_Ac_field
+
+
 
 end module multiscale
