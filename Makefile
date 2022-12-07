@@ -3,22 +3,22 @@ include make.inc
 TARGET = SSBE 
 
 OBJS = \
-math/math_constants.o \
-math/phys_constants.o \
-parallel/communication.o \
-io/salmon_file.o \
-common/structures.o \
-common/pack_unpack.o \
-util.o \
-sbe_gs.o \
-sbe_bloch_solver.o \
-test.o \
-input_parameter.o \
-rt/em_field.o \
-maxwell/fdtd_weyl_gauge.o \
-realtime.o \
-multiscale.o \
-main.o
+src/math/math_constants.o \
+src/math/phys_constants.o \
+src/parallel/communication.o \
+src/io/salmon_file.o \
+src/common/structures.o \
+src/common/pack_unpack.o \
+src/util.o \
+src/sbe_gs.o \
+src/sbe_bloch_solver.o \
+src/test.o \
+src/input_parameter.o \
+src/rt/em_field.o \
+src/maxwell/fdtd_weyl_gauge.o \
+src/realtime.o \
+src/multiscale.o \
+src/main.o
 
 $(TARGET): $(OBJS)
 	$(FC) -o $@ $^ $(FLAGS) $(LIBS)
