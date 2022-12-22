@@ -91,17 +91,30 @@ subroutine multiscale_main(icomm)
         ! Initialization of SBE solver and density matrix:
         do i = imacro_min, imacro_max
             call init_sbe(sbe(i), gs, nstate_sbe, icomm_macro)
-        end do    
+        end do
+    end if
 
+    if (nmacro > 0) then
         if (irank == 0) then
             write(tmp, "(a,a,a,a)") "mkdir ", trim(base_directory), trim(sysname), "_sbe_RT_Ac"
-            write(*, "(a)") trim(tmp)
             call system(trim(tmp))
+            write(tmp, "(a,a,a,a)") "mkdir ", trim(base_directory), trim(sysname), "_sbe_m"
+            call system(trim(tmp))
+            do imacro = 1, nmacro
+                write(tmp, "(a,a,a,a,i6.6)") "mkdir ", trim(base_directory), trim(sysname), "_sbe_m/m", imacro
+                call system(trim(tmp))
+            end do
         end if
+    end if
 
+    call comm_sync_all(icomm)
+
+    if (nmacro > 0) then
         if (irank_macro == 0) then
             do imacro = imacro_min, imacro_max
-                write(tmp, "(a,a,a,i6.6,a)") trim(base_directory), trim(sysname), "_sbe_macro_",imacro,"_rt.data"
+                write(tmp, "(a,a,a,i6.6,a,a,a)") trim(base_directory), trim(sysname), "_sbe_m/m", imacro, &
+                    &  "/", trim(sysname), "_sbe_rt.data"
+                ! write(*,*) trim(tmp)
                 open(1000+imacro, file=trim(tmp), action="write")
                 write(1000+imacro, '(4a)') "# 1:Time[a.u.] 2:Ac_ext_x[a.u.] 3:Ac_ext_y[a.u.] 4:Ac_ext_z[a.u.] ", &
                     & "5:E_ext_x[a.u.] 6:E_ext_y[a.u.] 7:E_ext_z[a.u.] 8:Ac_tot_x[a.u.] ", &
@@ -155,7 +168,7 @@ subroutine multiscale_main(icomm)
         call weyl_calc(fs, fw)
 
         if (irank == 0) then
-            if (mod(it, 100) == 0) call write_Ac_field(it, fs, fw)
+            if (mod(it, out_ms_step) == 0) call write_Ac_field(it, fs, fw)
             if (mod(it, 10) == 0) write(*, "(i6)") it
         end if
 

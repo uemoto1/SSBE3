@@ -52,6 +52,11 @@ setting = [
         ("nenergy", "integer", None, "1000"),
         ("de", "real(8)", None, "1.0d-3"),
         ("gamma", "real(8)", None, "5.0d-3"),
+        ("out_ms_step", "integer", None, "100"),
+        ("out_ms_ix", "integer", 2, "(/-1000000, 1000000/)"),
+        ("out_ms_iy", "integer", 2, "(/-1000000, 1000000/)"),
+        ("out_ms_iz", "integer", 2, "(/-1000000, 1000000/)"),
+        ("out_ms_it", "integer", 2, "(/-1000000, 1000000/)"),
     ]),
     ("multiscale", [
         ("fdtddim", "character(256)", None, "''"),
@@ -66,10 +71,6 @@ setting = [
         ("nyvac_m", "integer", 2, "0"),
         ("nzvac_m", "integer", 2, "0"),
         ("file_ms_shape", "character(256)", None, "''"),
-        ("out_ms_ix", "integer", 2, "(/-1000000, 1000000/)"),
-        ("out_ms_iy", "integer", 2, "(/-1000000, 1000000/)"),
-        ("out_ms_iz", "integer", 2, "(/-1000000, 1000000/)"),
-        ("out_ms_it", "integer", 2, "(/-1000000, 1000000/)"),
     ]),
     ("maxwell", [
         ("media_num", "integer", 0, "0"),
