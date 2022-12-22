@@ -52,6 +52,11 @@ setting = [
         ("nenergy", "integer", None, "1000"),
         ("de", "real(8)", None, "1.0d-3"),
         ("gamma", "real(8)", None, "5.0d-3"),
+        ("out_ms_step", "integer", None, "100"),
+        ("out_ms_ix", "integer", 2, "(/-1000000, 1000000/)"),
+        ("out_ms_iy", "integer", 2, "(/-1000000, 1000000/)"),
+        ("out_ms_iz", "integer", 2, "(/-1000000, 1000000/)"),
+        ("out_ms_it", "integer", 2, "(/-1000000, 1000000/)"),
     ]),
     ("multiscale", [
         ("fdtddim", "character(256)", None, "''"),
@@ -66,20 +71,31 @@ setting = [
         ("nyvac_m", "integer", 2, "0"),
         ("nzvac_m", "integer", 2, "0"),
         ("file_ms_shape", "character(256)", None, "''"),
-        ("out_ms_ix", "integer", 2, "(/-1000000, 1000000/)"),
-        ("out_ms_iy", "integer", 2, "(/-1000000, 1000000/)"),
-        ("out_ms_iz", "integer", 2, "(/-1000000, 1000000/)"),
-        ("out_ms_it", "integer", 2, "(/-1000000, 1000000/)"),
     ]),
     ("maxwell", [
-        ("media_num", "integer", 0, "0"),
-        # ("media_type", "character(256)", 9, "''"),
+        # ("al_em", "real(8)", 3, "0"),
+        # ("num_rgrid_em", "integer", 3, "0"),
+        # ("at_em", "real(8)", None, "0.0d0"),
+        #("media_num", "integer", 9, "0"),
+        #("media_type", "character(256)", 9, "'vacuum'"),
         ("epsilon_em", "real(8)", 9, "1.0d0"),
-        # ("sigma_em", "real(8)", 99, "0.0d0"),
-        # ("pole_num_ld", "integer", 99, "1"),
-        # ("alpha_ld", "real(8)", 99, "1.0d0"),
-        # ("gamma_ld", "real(8)", 99, "1.0d0"),
-        # ("omega_ld", "real(8)", 99, "1.0d0"),
+        # ("sigma_em", "real(8)", 9, "0.0d0"),
+        # ("pole_num_ld", "integer", 9, "1"),
+        # ("omega_p_ld", "real(8)", 9, "1.0d0"),
+        # ("gamma_ld", "real(8)", 9, "1.0d0"),
+        # ("omega_ld", "real(8)", 9, "1.0d0"),
+        # ("ek_dir1", "real(8)", 3, "(/1.0,0.0,0.0/)"),
+        # ("obs_num_em", "integer", None, "0"),
+        # ("obs_loc_em", "real(8)", (3, 9), "(/1.0,0.0,0.0/)"),
+        #("yn_make_shape", "character(1)", 9, "'n'"),
+        #("yn_output_shape", "character(1)", 9, "'n'"),
+        #("n_s", "integer", None, "0"),
+        #("id_s", "integer", 9, "0"),
+        #("typ_s", "character(256)", 9, "''"),
+        #("inf_s", "real(8)", [9, 3], "0.0d0"),
+        #("ori_s", "real(8)", [9, 3], "0.0d0"),
+        ("obs_num_em", "integer", None, "0"),
+        ("obs_loc_em", "real(8)", [9, 3], "0.0d0"),
     ]),
 ]
 
@@ -103,7 +119,7 @@ contains
         use communication
         implicit none
         integer, intent(in) :: icomm
-        integer :: ret, irank, nproc, ierr
+        integer :: ret, irank, nproc
         character(256) :: tmp
 
 {CODE_NAMELIST}
@@ -149,6 +165,10 @@ code_define = ""
 for group_name, group_data in setting:
     for var_name, var_type, var_dim, var_defval in group_data:
         if var_dim:
+            if type(var_dim) is int:
+                var_dim = str(var_dim)
+            else:
+                var_dim = ",".join([str(x) for x in var_dim])
             code_define += ind1 + "%s :: %s(%s)\n" % (var_type, var_name,var_dim)
         else:
             code_define += ind1 + "%s :: %s\n" % (var_type, var_name)
@@ -175,7 +195,12 @@ code_dump = ""
 for group_name, group_data in setting:
     for var_name, var_type, var_dim, var_defval in group_data:
         if var_type.startswith("character"):
-            code_dump += ind3 + "write(*,'(a,a)') '# %s: %s = ', trim(%s)\n" % (group_name, var_name, var_name)
+            if var_dim:
+                if type(var_dim) is int:
+                    for i in range(1, var_dim+1):
+                        code_dump += ind3 + "write(*,'(a,a)') '# %s: %s = ', trim(%s(%d))\n" % (group_name, var_name, var_name, i)
+            else:
+                code_dump += ind3 + "write(*,'(a,a)') '# %s: %s = ', trim(%s)\n" % (group_name, var_name, var_name)
         else:
             code_dump += ind3 + "write(*,'(a,99%s)') '# %s: %s = ', %s\n" % (tbl_fmt[var_type], group_name, var_name, var_name)
 

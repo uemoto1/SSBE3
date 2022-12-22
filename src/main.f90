@@ -19,7 +19,7 @@ program main
 
     if (irank == 0) then
         write(*, "(a)") "# SSBE3"
-        write(*, "(a,x,a,x,a)") "# version: 2022/12/14"
+        write(*, "(a,x,a,x,a)") "# version: 23.1.6"
         write(*, "(a)") "# -----"
         write(*, "(a)") "# Parallelization:"
         write(*, "(a,i6)") "# number of MPI processes=", nproc

@@ -40,6 +40,11 @@ module input_parameter
     integer :: nenergy
     real(8) :: de
     real(8) :: gamma
+    integer :: out_ms_step
+    integer :: out_ms_ix(2)
+    integer :: out_ms_iy(2)
+    integer :: out_ms_iz(2)
+    integer :: out_ms_it(2)
     character(256) :: fdtddim
     character(256) :: twod_shape
     integer :: nx_m
@@ -52,12 +57,9 @@ module input_parameter
     integer :: nyvac_m(2)
     integer :: nzvac_m(2)
     character(256) :: file_ms_shape
-    integer :: out_ms_ix(2)
-    integer :: out_ms_iy(2)
-    integer :: out_ms_iz(2)
-    integer :: out_ms_it(2)
-    integer :: media_num
     real(8) :: epsilon_em(9)
+    integer :: obs_num_em
+    real(8) :: obs_loc_em(9,3)
 
 
 contains
@@ -66,7 +68,7 @@ contains
         use communication
         implicit none
         integer, intent(in) :: icomm
-        integer :: ret, irank, nproc, ierr
+        integer :: ret, irank, nproc
         character(256) :: tmp
 
         namelist/calculation/ &
@@ -113,7 +115,12 @@ contains
         namelist/analysis/ &
         & nenergy, &
         & de, &
-        & gamma
+        & gamma, &
+        & out_ms_step, &
+        & out_ms_ix, &
+        & out_ms_iy, &
+        & out_ms_iz, &
+        & out_ms_it
         namelist/multiscale/ &
         & fdtddim, &
         & twod_shape, &
@@ -126,14 +133,11 @@ contains
         & nxvac_m, &
         & nyvac_m, &
         & nzvac_m, &
-        & file_ms_shape, &
-        & out_ms_ix, &
-        & out_ms_iy, &
-        & out_ms_iz, &
-        & out_ms_it
+        & file_ms_shape
         namelist/maxwell/ &
-        & media_num, &
-        & epsilon_em
+        & epsilon_em, &
+        & obs_num_em, &
+        & obs_loc_em
 
 
         theory = 'perturb_dielec'
@@ -174,6 +178,11 @@ contains
         nenergy = 1000
         de = 1.0d-3
         gamma = 5.0d-3
+        out_ms_step = 100
+        out_ms_ix = (/-1000000, 1000000/)
+        out_ms_iy = (/-1000000, 1000000/)
+        out_ms_iz = (/-1000000, 1000000/)
+        out_ms_it = (/-1000000, 1000000/)
         fdtddim = ''
         twod_shape = ''
         nx_m = 0
@@ -186,12 +195,9 @@ contains
         nyvac_m = 0
         nzvac_m = 0
         file_ms_shape = ''
-        out_ms_ix = (/-1000000, 1000000/)
-        out_ms_iy = (/-1000000, 1000000/)
-        out_ms_iz = (/-1000000, 1000000/)
-        out_ms_it = (/-1000000, 1000000/)
-        media_num = 0
         epsilon_em = 1.0d0
+        obs_num_em = 0
+        obs_loc_em = 0.0d0
 
 
         call comm_get_groupinfo(icomm, irank, nproc)
@@ -254,6 +260,11 @@ contains
             write(*,'(a,99i9)') '# analysis: nenergy = ', nenergy
             write(*,'(a,99es25.15e3)') '# analysis: de = ', de
             write(*,'(a,99es25.15e3)') '# analysis: gamma = ', gamma
+            write(*,'(a,99i9)') '# analysis: out_ms_step = ', out_ms_step
+            write(*,'(a,99i9)') '# analysis: out_ms_ix = ', out_ms_ix
+            write(*,'(a,99i9)') '# analysis: out_ms_iy = ', out_ms_iy
+            write(*,'(a,99i9)') '# analysis: out_ms_iz = ', out_ms_iz
+            write(*,'(a,99i9)') '# analysis: out_ms_it = ', out_ms_it
             write(*,'(a,a)') '# multiscale: fdtddim = ', trim(fdtddim)
             write(*,'(a,a)') '# multiscale: twod_shape = ', trim(twod_shape)
             write(*,'(a,99i9)') '# multiscale: nx_m = ', nx_m
@@ -266,12 +277,9 @@ contains
             write(*,'(a,99i9)') '# multiscale: nyvac_m = ', nyvac_m
             write(*,'(a,99i9)') '# multiscale: nzvac_m = ', nzvac_m
             write(*,'(a,a)') '# multiscale: file_ms_shape = ', trim(file_ms_shape)
-            write(*,'(a,99i9)') '# multiscale: out_ms_ix = ', out_ms_ix
-            write(*,'(a,99i9)') '# multiscale: out_ms_iy = ', out_ms_iy
-            write(*,'(a,99i9)') '# multiscale: out_ms_iz = ', out_ms_iz
-            write(*,'(a,99i9)') '# multiscale: out_ms_it = ', out_ms_it
-            write(*,'(a,99i9)') '# maxwell: media_num = ', media_num
             write(*,'(a,99es25.15e3)') '# maxwell: epsilon_em = ', epsilon_em
+            write(*,'(a,99i9)') '# maxwell: obs_num_em = ', obs_num_em
+            write(*,'(a,99es25.15e3)') '# maxwell: obs_loc_em = ', obs_loc_em
 
         end if
         call comm_bcast(theory, icomm, 0)
@@ -312,6 +320,11 @@ contains
         call comm_bcast(nenergy, icomm, 0)
         call comm_bcast(de, icomm, 0)
         call comm_bcast(gamma, icomm, 0)
+        call comm_bcast(out_ms_step, icomm, 0)
+        call comm_bcast(out_ms_ix, icomm, 0)
+        call comm_bcast(out_ms_iy, icomm, 0)
+        call comm_bcast(out_ms_iz, icomm, 0)
+        call comm_bcast(out_ms_it, icomm, 0)
         call comm_bcast(fdtddim, icomm, 0)
         call comm_bcast(twod_shape, icomm, 0)
         call comm_bcast(nx_m, icomm, 0)
@@ -324,12 +337,9 @@ contains
         call comm_bcast(nyvac_m, icomm, 0)
         call comm_bcast(nzvac_m, icomm, 0)
         call comm_bcast(file_ms_shape, icomm, 0)
-        call comm_bcast(out_ms_ix, icomm, 0)
-        call comm_bcast(out_ms_iy, icomm, 0)
-        call comm_bcast(out_ms_iz, icomm, 0)
-        call comm_bcast(out_ms_it, icomm, 0)
-        call comm_bcast(media_num, icomm, 0)
         call comm_bcast(epsilon_em, icomm, 0)
+        call comm_bcast(obs_num_em, icomm, 0)
+        call comm_bcast(obs_loc_em, icomm, 0)
 
 
     end subroutine read_input

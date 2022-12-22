@@ -29,12 +29,14 @@ subroutine multiscale_main(icomm)
     integer, allocatable :: itbl_macro_coord(:, :)
     integer :: nmacro, nmacro_max
     integer :: imacro_min, imacro_max
-    integer :: ix, iy, iz, mt, imacro
+    integer :: ix, iy, iz, mt, imacro, iobs
     real(8) :: jmat(3)
 
     type(s_fdtd_system) :: fs
     type(ls_fdtd_weyl) :: fw
     character(256) :: tmp
+
+    logical :: flag_1d_model
 
     call comm_get_groupinfo(icomm, irank, nproc)
 
@@ -51,6 +53,8 @@ subroutine multiscale_main(icomm)
     fs%hgs(1:3) = (/ hx_m, hy_m, hz_m /)
     fw%dt = dt
     call weyl_init(fs, fw)
+
+    flag_1d_model = ((ny_m == 1) .and. (nz_m == 1))
 
     ! Prepare external pulse
     mt = max(nt, int(abs(nxvac_m(1)) * fs%hgs(1) / cspeed_au / dt))
@@ -91,22 +95,66 @@ subroutine multiscale_main(icomm)
         ! Initialization of SBE solver and density matrix:
         do i = imacro_min, imacro_max
             call init_sbe(sbe(i), gs, nstate_sbe, icomm_macro)
-        end do    
+        end do
+    end if
 
+    if (nmacro > 0) then
         if (irank == 0) then
             write(tmp, "(a,a,a,a)") "mkdir ", trim(base_directory), trim(sysname), "_sbe_RT_Ac"
-            write(*, "(a)") trim(tmp)
             call system(trim(tmp))
+            write(tmp, "(a,a,a,a)") "mkdir ", trim(base_directory), trim(sysname), "_sbe_m"
+            call system(trim(tmp))
+            do imacro = 1, nmacro
+                write(tmp, "(a,a,a,a,i6.6)") "mkdir ", trim(base_directory), trim(sysname), "_sbe_m/m", imacro
+                call system(trim(tmp))
+            end do
         end if
 
+    end if
+
+    call comm_sync_all(icomm)
+
+    if (nmacro > 0) then
         if (irank_macro == 0) then
+            if (flag_1d_model) then
+                ! _sbe_wave.data
+                write(tmp, "(a,a,a)") trim(base_directory), trim(sysname), "_sbe_wave.data"
+                open(99, file=trim(tmp), action="write")
+                write(99, '("#",99(1X,I0,":",A,"[",A,"]"))') &
+                    & 1, "Time", "[a.u.]", &
+                    & 2, "E_inc_x", "[a.u.]", &
+                    & 3, "E_inc_y", "[a.u.]", &
+                    & 4, "E_inc_z", "[a.u.]", &
+                    & 5, "E_ref_x", "[a.u.]", &
+                    & 6, "E_ref_y", "[a.u.]", &
+                    & 7, "E_ref_z", "[a.u.]", &
+                    & 8, "E_tra_x", "[a.u.]", &
+                    & 9, "E_tra_y", "[a.u.]", &
+                    & 10, "E_tra_z", "[a.u.]"
+            end if
+            ! _sbe_rt.data
             do imacro = imacro_min, imacro_max
-                write(tmp, "(a,a,a,i6.6,a)") trim(base_directory), trim(sysname), "_sbe_macro_",imacro,"_rt.data"
+                write(tmp, "(a,a,a,i6.6,a,a,a)") trim(base_directory), trim(sysname), "_sbe_m/m", imacro, &
+                    &  "/", trim(sysname), "_sbe_rt.data"
+                ! write(*,*) trim(tmp)
                 open(1000+imacro, file=trim(tmp), action="write")
                 write(1000+imacro, '(4a)') "# 1:Time[a.u.] 2:Ac_ext_x[a.u.] 3:Ac_ext_y[a.u.] 4:Ac_ext_z[a.u.] ", &
                     & "5:E_ext_x[a.u.] 6:E_ext_y[a.u.] 7:E_ext_z[a.u.] 8:Ac_tot_x[a.u.] ", &
                     & "9:Ac_tot_y[a.u.] 10:Ac_tot_z[a.u.] 11:E_tot_x[a.u.] 12:E_tot_y[a.u.] ", &
                     & "13:E_tot_z[a.u.]  14:Jm_x[a.u.] 15:Jm_y[a.u.] 16:Jm_z[a.u.]"
+            end do
+            ! _obs_sbe_rt.data
+            do iobs = 1, obs_num_em
+                write(tmp, "(a,a,a,i3.3,a)") trim(base_directory), trim(sysname), "_sbe_obs_", obs_num_em, "_at_point_rt.data"
+                open(100+iobs, file=trim(tmp), action="write")
+                write(100+iobs,'("#",99(1X,I0,":",A))') &
+                1, "Time[a.u.]",                &
+                2, "E_x[a.u.]",                 &
+                3, "E_y[a.u.]",                 &
+                4, "E_z[a.u.]",                 &
+                5, "H_x[a.u.]",                 &
+                6, "H_y[a.u.]",                 &
+                7, "H_z[a.u.]"
             end do
         end if
     end if
@@ -155,16 +203,26 @@ subroutine multiscale_main(icomm)
         call weyl_calc(fs, fw)
 
         if (irank == 0) then
-            if (mod(it, 100) == 0) call write_Ac_field(it, fs, fw)
-            if (mod(it, 10) == 0) write(*, "(i6)") it
+            if (mod(it, out_ms_step) == 0) then
+                call write_Ac_field(it, fs, fw)
+            end if
+            if (mod(it, 10) == 0) then
+                write(*, "(a,i6)") "Time step = ", it
+                if (flag_1d_model) call write_wave_data_file(it, fs, fw)
+                call write_obs_data_file(it, fs, fw)
+            end if
         end if
 
     end do
 
     if (nmacro > 0) then
         if (irank_macro == 0) then
+            if (flag_1d_model) close(99)
             do imacro = imacro_min, imacro_max
                 close(1000+imacro)
+            end do
+            do iobs = 1, obs_num_em
+                close(100+iobs)
             end do
         end if
     end if
@@ -256,6 +314,31 @@ subroutine read_media_info(nmacro_max, itbl_macro_coord, nmacro, fw)
     nmacro = imacro
 end subroutine 
 
+
+! subroutine read_shape_info(fs, fw)
+!     use input_parameter, only: file_ms_shape, epsilon_em, nx_m, ny_m, nz_m
+!     use fdtd_weyl, only: ls_fdtd_weyl
+!     implicit none
+!     integer, intent(in) :: nmacro_max
+!     integer, intent(out) :: itbl_macro_coord(1:3, nmacro_max)
+!     integer, intent(out) :: nmacro
+!     type(s_fdtd_system), intent(in) :: fs
+!     type(ls_fdtd_weyl), intent(inout) :: fw
+
+!     integer :: itbl_media( &
+!         & fw%mg%is(1):fw%mg%ie(1), &
+!         & fw%mg%is(2):fw%mg%ie(2), &
+!         & fw%mg%is(3):fw%mg%ie(3), &
+!         & )
+
+!     do i = 1, n_s
+!         select case trim(typ_s(i))
+!         case "ellipsoid"
+!         end select
+!     end do
+! end subroutine read_shape_info
+        
+
 subroutine set_incident_field(mt, Ac, fs, fw)
     use fdtd_weyl, only: s_fdtd_system, ls_fdtd_weyl
     use phys_constants, only: cspeed_au
@@ -341,6 +424,82 @@ subroutine write_Ac_field(iit, fs, fw)
     close(999)
 end subroutine write_Ac_field
 
+ ! Experimetal Implementation of Incident/Reflection/Transmit field output
+subroutine write_wave_data_file(iit, fs, fw)
+    use input_parameter, only: sysname, nx_m
+    use fdtd_weyl, only: s_fdtd_system, ls_fdtd_weyl
+    use phys_constants, only: cspeed_au
+    implicit none
+    integer, intent(in) :: iit
+    type(s_fdtd_system), intent(in) :: fs
+    type(ls_fdtd_weyl), intent(in) :: fw
+    real(8) :: dt
 
+    real(8) :: e_inc(3)
+    real(8) :: e_ref(3)
+    real(8) :: e_tra(3)
+    real(8) :: dt_Ac(3)
+    real(8) :: dx_Ac(3)
+    integer :: iiy, iiz
+
+    iiy = fs%mg%is(2)
+    iiz = fs%mg%is(3)
+    dt = fw%dt
+
+    ! Left side boundary:
+    dx_Ac(:) = (fw%vec_Ac%v(:,0,iiy,iiz) - fw%vec_Ac%v(:,-1,iiy,iiz)) / fs%hgs(1)
+    dt_Ac(:) = (0.5d0 * (fw%vec_Ac_new%v(:,0,iiy,iiz) + fw%vec_Ac_new%v(:,-1,iiy,iiz)) & 
+        & - 0.5d0 * (fw%vec_Ac_old%v(:,0,iiy,iiz) + fw%vec_Ac_old%v(:,-1,iiy,iiz))) / (2 * dt)
+    
+    e_inc(:) = -0.5d0 * (dt_Ac - cspeed_au * dx_Ac)
+    e_ref(:) = -0.5d0 * (dt_Ac + cspeed_au * dx_Ac)
+
+    ! Right side boundary:
+    dx_Ac(:) = (fw%vec_Ac%v(:,nx_m+2,iiy,iiz) - fw%vec_Ac%v(:,nx_m+1,iiy,iiz)) / fs%hgs(1)
+    dt_Ac(:) = (0.5d0 * (fw%vec_Ac_new%v(:,nx_m+2,iiy,iiz) + fw%vec_Ac_new%v(:,nx_m+1,iiy,iiz)) & 
+        & - 0.5d0 * (fw%vec_Ac_old%v(:,nx_m+2,iiy,iiz) + fw%vec_Ac_old%v(:,nx_m+1,iiy,iiz))) / (2 * dt)
+    
+    e_tra(:) = -0.5d0 * (dt_Ac - cspeed_au * dx_Ac)
+
+    write(99, '(99(e23.15e3, 1x))')  &
+        & iit * dt * 1.0d0, &
+        & e_inc(1) * 1.0d0, &
+        & e_inc(2) * 1.0d0, &
+        & e_inc(3) * 1.0d0, &
+        & e_ref(1) * 1.0d0, &
+        & e_ref(2) * 1.0d0, &
+        & e_ref(3) * 1.0d0, &
+        & e_tra(1) * 1.0d0, &
+        & e_tra(2) * 1.0d0, &
+        & e_tra(3) * 1.0d0
+    return
+end subroutine write_wave_data_file
+
+subroutine write_obs_data_file(iit, fs, fw)
+    use input_parameter, only: sysname, nx_m, obs_num_em, obs_loc_em
+    use fdtd_weyl, only: s_fdtd_system, ls_fdtd_weyl
+    use phys_constants, only: cspeed_au
+    implicit none
+    integer, intent(in) :: iit
+    type(s_fdtd_system), intent(in) :: fs
+    type(ls_fdtd_weyl), intent(in) :: fw
+    real(8) :: dt
+    real(8) :: e(3)
+    integer :: iix, iiy, iiz, iobs
+
+    dt = fw%dt
+    do iobs = 1, obs_num_em
+        iix = int(obs_loc_em(iobs, 1) / fs%hgs(1))
+        iiy = int(obs_loc_em(iobs, 2) / fs%hgs(2))
+        iiz = int(obs_loc_em(iobs, 3) / fs%hgs(3))
+        iix = min(fs%mg%ie(1), max(fs%mg%is(1), iix))
+        iiy = min(fs%mg%ie(2), max(fs%mg%is(2), iiy))
+        iiz = min(fs%mg%ie(3), max(fs%mg%is(3), iiz))
+        write(*, *) "ii", iix, iiy, iiz
+        e(:) =  -(fw%vec_Ac_new%v(:, iix, iiy, iiz) - fw%vec_Ac_old%v(:, iix, iiy, iiz)) / (2 * dt)
+        write(100+iobs, "(f12.6,99es25.15e4)") iit * dt, e(1:3)
+    end do
+    return 
+end subroutine write_obs_data_file
 
 end module multiscale
