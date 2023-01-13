@@ -109,7 +109,6 @@ subroutine multiscale_main(icomm)
                 call system(trim(tmp))
             end do
         end if
-
     end if
 
     call comm_sync_all(icomm)

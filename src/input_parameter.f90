@@ -57,6 +57,7 @@ module input_parameter
     integer :: nyvac_m(2)
     integer :: nzvac_m(2)
     character(256) :: file_ms_shape
+    integer :: media_num
     real(8) :: epsilon_em(9)
     integer :: obs_num_em
     real(8) :: obs_loc_em(9,3)
@@ -195,6 +196,7 @@ contains
         nyvac_m = 0
         nzvac_m = 0
         file_ms_shape = ''
+        media_num = 0
         epsilon_em = 1.0d0
         obs_num_em = 0
         obs_loc_em = 0.0d0
@@ -277,6 +279,7 @@ contains
             write(*,'(a,99i9)') '# multiscale: nyvac_m = ', nyvac_m
             write(*,'(a,99i9)') '# multiscale: nzvac_m = ', nzvac_m
             write(*,'(a,a)') '# multiscale: file_ms_shape = ', trim(file_ms_shape)
+            write(*,'(a,99i9)') '# maxwell: media_num = ', media_num
             write(*,'(a,99es25.15e3)') '# maxwell: epsilon_em = ', epsilon_em
             write(*,'(a,99i9)') '# maxwell: obs_num_em = ', obs_num_em
             write(*,'(a,99es25.15e3)') '# maxwell: obs_loc_em = ', obs_loc_em
@@ -337,6 +340,7 @@ contains
         call comm_bcast(nyvac_m, icomm, 0)
         call comm_bcast(nzvac_m, icomm, 0)
         call comm_bcast(file_ms_shape, icomm, 0)
+        call comm_bcast(media_num, icomm, 0)
         call comm_bcast(epsilon_em, icomm, 0)
         call comm_bcast(obs_num_em, icomm, 0)
         call comm_bcast(obs_loc_em, icomm, 0)
