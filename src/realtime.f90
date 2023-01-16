@@ -45,6 +45,13 @@ subroutine realtime_main(icomm)
     ! Realtime calculation
     if (irank == 0) then
         open(unit=100, file=trim(base_directory)//trim(sysname)//"_sbe_rt.data")
+
+        write(100, '(a)') "# Real time calculation:"
+        write(100, '(a)') "# Ac_ext: External vector potential field"
+        write(100, '(a)') "# E_ext: External electric field"
+        write(100, '(a)') "# Ac_tot: Total vector potential field"
+        write(100, '(a)') "# E_tot: Total electric field"
+        write(100, '(a)') "# Jm: Matter current density (electrons)"
         write(100, '(4a)') "# 1:Time[a.u.] 2:Ac_ext_x[a.u.] 3:Ac_ext_y[a.u.] 4:Ac_ext_z[a.u.] ", &
             & "5:E_ext_x[a.u.] 6:E_ext_y[a.u.] 7:E_ext_z[a.u.] 8:Ac_tot_x[a.u.] ", &
             & "9:Ac_tot_y[a.u.] 10:Ac_tot_z[a.u.] 11:E_tot_x[a.u.] 12:E_tot_y[a.u.] ", &
@@ -52,11 +59,11 @@ subroutine realtime_main(icomm)
 
         open(unit=101, file=trim(base_directory)//trim(sysname)//"_sbe_rt_energy.data")
         write(101, '(a)') "# 1:Time[a.u.] 2:Eall[a.u.] 3:Eall-Eall0[a.u.]"
+        write(101, '(f12.6,2(es24.15e3))') 0.0d0, energy0, 0.0d0
 
         open(unit=102, file=trim(base_directory)//trim(sysname)//"_sbe_nex.data")
         write(102, '(a)') "# 1:Time[a.u.] 2:nelec[a.u.] 3:nhole[a.u.]"
 
-        write(101, '(f12.6,2(es24.15e3))') 0.0d0, energy0, 0.0d0
     end if
     
 
@@ -64,7 +71,7 @@ subroutine realtime_main(icomm)
         t = dt * it
         call dt_evolve_bloch(sbe, gs, Ac_ext_t(:, it), dt)
 
-        if (mod(it, 10) == 0) then
+        ! if (mod(it, 1) == 0) then
             E(:) = -(Ac_ext_t(:, it + 1) - Ac_ext_t(:, it - 1)) / (2 * dt)
             call calc_current_bloch(sbe, gs, Ac_ext_t(:, it), Jmat, icomm)
             energy = calc_energy(sbe, gs, Ac_ext_t(:, it), icomm)
@@ -73,9 +80,14 @@ subroutine realtime_main(icomm)
             
             if (irank == 0) then
                 write(100, '(f12.6,15(es24.15e3))') t, Ac_ext_t(:, it), E(:), Ac_ext_t(:, it), E(:), Jmat(:)
+            end if
+        ! end if
+
+        if (mod(it, 100) == 0) then
+            if (irank == 0) then
                 write(101, '(f12.6,2(es24.15e3))') t, energy, energy-energy0
                 write(102, '(f12.6,2(es24.15e3))') t, tr_all - tr_vb, nelec - tr_vb 
-                write(*, '(f12.6,es24.15e3)') t, tr_all
+                write(*, '(i6,f12.6,es24.15e3)') it, t, tr_all
             end if
         end if
 

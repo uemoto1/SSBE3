@@ -152,6 +152,12 @@ subroutine multiscale_main(icomm)
                     &  "/", trim(sysname), "_sbe_rt.data"
                 ! write(*,*) trim(tmp)
                 open(1000+imacro, file=trim(tmp), action="write")
+                write(1000+imacro, '(a)') "# Real time calculation:"
+                write(1000+imacro, '(a)') "# Ac_ext: External vector potential field"
+                write(1000+imacro, '(a)') "# E_ext: External electric field"
+                write(1000+imacro, '(a)') "# Ac_tot: Total vector potential field"
+                write(1000+imacro, '(a)') "# E_tot: Total electric field"
+                write(1000+imacro, '(a)') "# Jm: Matter current density (electrons)"
                 write(1000+imacro, '(4a)') "# 1:Time[a.u.] 2:Ac_ext_x[a.u.] 3:Ac_ext_y[a.u.] 4:Ac_ext_z[a.u.] ", &
                     & "5:E_ext_x[a.u.] 6:E_ext_y[a.u.] 7:E_ext_z[a.u.] 8:Ac_tot_x[a.u.] ", &
                     & "9:Ac_tot_y[a.u.] 10:Ac_tot_z[a.u.] 11:E_tot_x[a.u.] 12:E_tot_y[a.u.] ", &
