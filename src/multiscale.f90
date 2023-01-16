@@ -114,7 +114,7 @@ subroutine multiscale_main(icomm)
     call comm_sync_all(icomm)
 
     if (nmacro > 0) then
-        if (irank_macro == 0) then
+        if (irank == 0) then
             if (flag_1d_model) then
                 ! _sbe_wave.data
                 write(tmp, "(a,a,a)") trim(base_directory), trim(sysname), "_sbe_wave.data"
@@ -131,17 +131,6 @@ subroutine multiscale_main(icomm)
                     & 9, "E_tra_y", "[a.u.]", &
                     & 10, "E_tra_z", "[a.u.]"
             end if
-            ! _sbe_rt.data
-            do imacro = imacro_min, imacro_max
-                write(tmp, "(a,a,a,i6.6,a,a,a)") trim(base_directory), trim(sysname), "_sbe_m/m", imacro, &
-                    &  "/", trim(sysname), "_sbe_rt.data"
-                ! write(*,*) trim(tmp)
-                open(1000+imacro, file=trim(tmp), action="write")
-                write(1000+imacro, '(4a)') "# 1:Time[a.u.] 2:Ac_ext_x[a.u.] 3:Ac_ext_y[a.u.] 4:Ac_ext_z[a.u.] ", &
-                    & "5:E_ext_x[a.u.] 6:E_ext_y[a.u.] 7:E_ext_z[a.u.] 8:Ac_tot_x[a.u.] ", &
-                    & "9:Ac_tot_y[a.u.] 10:Ac_tot_z[a.u.] 11:E_tot_x[a.u.] 12:E_tot_y[a.u.] ", &
-                    & "13:E_tot_z[a.u.]  14:Jm_x[a.u.] 15:Jm_y[a.u.] 16:Jm_z[a.u.]"
-            end do
             ! _obs_sbe_rt.data
             do iobs = 1, obs_num_em
                 write(tmp, "(a,a,a,i3.3,a)") trim(base_directory), trim(sysname), "_sbe_obs_", obs_num_em, "_at_point_rt.data"
@@ -154,6 +143,19 @@ subroutine multiscale_main(icomm)
                 5, "H_x[a.u.]",                 &
                 6, "H_y[a.u.]",                 &
                 7, "H_z[a.u.]"
+            end do
+        end if
+        if (irank_macro == 0) then
+            ! _sbe_rt.data
+            do imacro = imacro_min, imacro_max
+                write(tmp, "(a,a,a,i6.6,a,a,a)") trim(base_directory), trim(sysname), "_sbe_m/m", imacro, &
+                    &  "/", trim(sysname), "_sbe_rt.data"
+                ! write(*,*) trim(tmp)
+                open(1000+imacro, file=trim(tmp), action="write")
+                write(1000+imacro, '(4a)') "# 1:Time[a.u.] 2:Ac_ext_x[a.u.] 3:Ac_ext_y[a.u.] 4:Ac_ext_z[a.u.] ", &
+                    & "5:E_ext_x[a.u.] 6:E_ext_y[a.u.] 7:E_ext_z[a.u.] 8:Ac_tot_x[a.u.] ", &
+                    & "9:Ac_tot_y[a.u.] 10:Ac_tot_z[a.u.] 11:E_tot_x[a.u.] 12:E_tot_y[a.u.] ", &
+                    & "13:E_tot_z[a.u.]  14:Jm_x[a.u.] 15:Jm_y[a.u.] 16:Jm_z[a.u.]"
             end do
         end if
     end if
