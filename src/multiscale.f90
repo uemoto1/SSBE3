@@ -118,8 +118,8 @@ subroutine multiscale_main(icomm)
             if (flag_1d_model) then
                 ! _sbe_wave.data
                 write(tmp, "(a,a,a)") trim(base_directory), trim(sysname), "_sbe_wave.data"
-                open(99, file=trim(tmp), action="write")
-                write(99, '("#",99(1X,I0,":",A,"[",A,"]"))') &
+                open(888, file=trim(tmp), action="write")
+                write(888, '("#",99(1X,I0,":",A,"[",A,"]"))') &
                     & 1, "Time", "[a.u.]", &
                     & 2, "E_inc_x", "[a.u.]", &
                     & 3, "E_inc_y", "[a.u.]", &
@@ -157,6 +157,8 @@ subroutine multiscale_main(icomm)
             end do
         end if
     end if
+
+    call comm_sync_all(icomm)
 
     do it = 1, nt
         t = dt * it
@@ -210,7 +212,14 @@ subroutine multiscale_main(icomm)
                 if (flag_1d_model) call write_wave_data_file(it, fs, fw)
                 call write_obs_data_file(it, fs, fw)
             end if
+            if (mod(it, 1000) == 0) then
+                if (flag_1d_model) flush(888)
+                do iobs = 1, obs_num_em
+                    flush(100+iobs)
+                end do
+            end if
         end if
+
 
     end do
 
@@ -223,8 +232,11 @@ subroutine multiscale_main(icomm)
             do iobs = 1, obs_num_em
                 close(100+iobs)
             end do
+            close(888)
         end if
     end if
+
+    call comm_sync_all(icomm)
 
     return
 end subroutine multiscale_main
@@ -460,7 +472,7 @@ subroutine write_wave_data_file(iit, fs, fw)
     
     e_tra(:) = -0.5d0 * (dt_Ac - cspeed_au * dx_Ac)
 
-    write(99, '(99(e23.15e3, 1x))')  &
+    write(888, '(99(e23.15e3, 1x))')  &
         & iit * dt * 1.0d0, &
         & e_inc(1) * 1.0d0, &
         & e_inc(2) * 1.0d0, &
@@ -494,7 +506,6 @@ subroutine write_obs_data_file(iit, fs, fw)
         iix = min(fs%mg%ie(1), max(fs%mg%is(1), iix))
         iiy = min(fs%mg%ie(2), max(fs%mg%is(2), iiy))
         iiz = min(fs%mg%ie(3), max(fs%mg%is(3), iiz))
-        write(*, *) "ii", iix, iiy, iiz
         e(:) =  -(fw%vec_Ac_new%v(:, iix, iiy, iiz) - fw%vec_Ac_old%v(:, iix, iiy, iiz)) / (2 * dt)
         write(100+iobs, "(f12.6,99es25.15e4)") iit * dt, e(1:3)
     end do
